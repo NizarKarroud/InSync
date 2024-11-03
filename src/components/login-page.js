@@ -111,7 +111,7 @@ function RegisterSection({ onChangeSection }) {
                     <button type="submit" className="login-button">Register</button>
                 </form>
                 <button onClick={() => onChangeSection("login")} className="login-button">
-                    ← Back to Login
+                    Back to Login
                 </button>
             </div>
         </div>
