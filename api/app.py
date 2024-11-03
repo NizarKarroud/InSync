@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from flask_pymongo import PyMongo
 import os
 from models import Registration
+from werkzeug.security import generate_password_hash , check_password_hash
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -37,8 +39,17 @@ def login():
 @app.route('/register' , methods=['POST'])
 def register():
     data = request.get_json()
-    mongo.db.registration.insert_one(data)
-    return jsonify({"message": "User registered successfully"}), 201
+
+    username = data.get("username")
+    email = data.get("email")
+    password = generate_password_hash(data.get("password"))
+    last_name = data.get("last_name")
+    role = data.get("role")
+    first_name = data.get('first_name')
+    registration_form = Registration(username , email , password , first_name , last_name , role).json()
+    mongo.db.registration.insert_one(registration_form)
+    return '', 204  # 204 No Content
+
 
 if __name__ == '__main__':
     app.run('0.0.0.0', 16000 , debug=True)

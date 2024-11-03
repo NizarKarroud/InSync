@@ -105,8 +105,8 @@ function RegisterSection({ onChangeSection }) {
                     <input type="text" className="input-field" placeholder="Last Name" required />
                     <select className="input-field" required>
                         <option value="">Select Role</option>
-                        <option value="admin">Admin</option>
-                        <option value="user">User</option>
+                        <option value="admin">student</option>
+                        <option value="user">faculty member</option>
                     </select>
                     <button type="submit" className="login-button">Register</button>
                 </form>
