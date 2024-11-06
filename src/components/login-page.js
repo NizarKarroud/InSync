@@ -21,7 +21,7 @@ function LoginSection({ onChangeSection }) {
         const data = { username, password };
 
         try {
-            const response = await fetch("/login", {
+            const response = await fetch("/user/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json", 
