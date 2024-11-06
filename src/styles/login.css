@@ -37,7 +37,7 @@ body {
     text-align: center;
 }
 
-.welcome-text {
+.welcome-text , .login-text  ,.registration-text{
     color: #A3A3A3;
     font-size: 18px;
     text-align: center;
@@ -116,12 +116,13 @@ body {
     font-size: 14px;
 }
 
-.links a {
+a{
     color: #A3A3A3;
     text-decoration: none;
+    text-decoration: underline;
 }
 
-.links a:hover {
+a:hover {
     color: #5E3F75;
 }
 

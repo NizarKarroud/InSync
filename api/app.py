@@ -8,8 +8,9 @@ import os
 from werkzeug.security import generate_password_hash , check_password_hash
 from dotenv import load_dotenv
 from threading import Thread
+import models
 
-import models 
+
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URI")
 
-db = SQLAlchemy(app)
+models.db.init_app(app)  
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
@@ -29,16 +30,9 @@ app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PWD')
 
 app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")  
 
+
 jwt = JWTManager(app)
-
 mail = Mail(app)
-
-from threading import Thread
-
-def send_email(app, msg):
-    with app.app_context():
-        mail.send(msg)
-
 mongo = PyMongo(app)
 
 SWAGGER_URL = '/api/docs'  
@@ -54,12 +48,24 @@ swaggerui_blueprint = get_swaggerui_blueprint(
 
 app.register_blueprint(swaggerui_blueprint)
 
+
+def send_email(app, msg):
+    with app.app_context():
+        mail.send(msg)
+
 @app.route('/user/login' , methods=['POST'])
 def login():
     data = request.get_json()  # Get the JSON data sent by the client
     username = data.get('username')
     password = data.get('password')
-    print(username , password)
+
+    user_availability = models.User.query.filter_by(username=username).first()
+    if user_availability : 
+        hashed_password = user_availability.password
+        if check_password_hash(hashed_password , password):
+            return jsonify({"status" : "correct credentials"}) , 200
+
+    return jsonify({"status" : "wrong credentials"}) , 401
 
 @app.route('/user/register' , methods=['POST'])
 def register():
@@ -71,10 +77,32 @@ def register():
     last_name = data.get("last_name")
     role = data.get("role")
     first_name = data.get('first_name')
+
+    user_availability =models.User.query.filter_by(username=username).first()
+    email_availability =models.User.query.filter_by(email=email).first()
+
+    if email_availability : 
+            return jsonify({"status" : "Email already used"}) , 400
+    if user_availability :
+            return jsonify({"status" : "Username already used"}) , 400
+    
     registration_form = models.Registration(username , email , password , first_name , last_name , role).json
     mongo.db.registration.insert_one(registration_form)
-    return '', 204  # 204 No Content
+   
+    new_user = models.User(
+        username=username,
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name,
+        role=role ,
+        account_status="active"
+    )
 
+    models.db.session.add(new_user)
+    models.db.session.commit()
+
+    return jsonify({"status" : "Registration Form sent to the Administrator , please wait for the approval"}), 200
 
 
 @app.route('/user/forgotpwd' , methods=['POST'])
@@ -102,7 +130,6 @@ def forgot_password():
     return jsonify(
         message=f"If a user with the email '{user_email}' exists, a recovery email has been sent."
     )
-
 
 @app.route('/user/reset_password' , methods=['POST'])
 @jwt_required()

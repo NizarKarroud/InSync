@@ -1,5 +1,7 @@
 from datetime import datetime , timezone
-from app import db
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
 
 class Registration:
     def __init__(self, username, email, password, first_name, last_name, role):
@@ -24,7 +26,6 @@ class Registration:
             "registration_date": self.registration_date.isoformat(),
             "status": self.status,
             "admin_comments": self.admin_comments,
-            "is_active": self.is_active,
             "role": self.role
         }
 
@@ -65,7 +66,7 @@ class UserMessage:
 
 class User(db.Model):
     __tablename__ = "Users"
-    user_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(50) , nullable=False)
     password = db.Column(db.String(255) , nullable=False)
     email = db.Column(db.String(100) , unique=True,nullable=False)
@@ -75,13 +76,14 @@ class User(db.Model):
     account_status = db.Column(db.String(20), nullable=False) 
     isLogged = db.Column(db.Boolean, default=False, nullable=False)
     role = db.Column(db.String(20) , nullable=False)
-    rooms = db.relationship('Room', secondary='RoomUsers', backref='users')
+
+    rooms = db.relationship('Room', secondary='RoomUsers', backref=db.backref('users', lazy='dynamic'))
 
 class Room(db.Model):
     __tablename__ = "Rooms"
-    room_id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, primary_key=True , autoincrement=True)
     room_type = db.Column(db.String(10) , nullable=False)
-    users = db.relationship('User', secondary='RoomUsers', backref='rooms')
+    
 
 class RoomUsers(db.Model):
     __tablename__ = "RoomUsers"
@@ -89,6 +91,6 @@ class RoomUsers(db.Model):
     room_id = db.Column(db.Integer, db.ForeignKey('Rooms.room_id'), primary_key=True)
 
 
-"""
-    gonna store the file locally in static/files/room_id/file.extension
-"""
+# """
+#     gonna store the file locally in static/files/room_id/file.extension
+# """
