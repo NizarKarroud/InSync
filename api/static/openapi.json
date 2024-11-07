@@ -2,310 +2,282 @@
   "openapi": "3.0.3",
   "info": {
     "title": "InSync API",
-    "description": "This is a sample Pet Store Server based on the OpenAPI 3.0 specification.  You can find out more about\nSwagger at [https://swagger.io](https://swagger.io). In the third iteration of the pet store, we've switched to the design first approach!\nYou can now help us improve the API whether it's by making changes to the definition itself or to the code.\nThat way, with time, we can improve the API in general, and expose some of the new features in OAS3.\n\n_If you're looking for the Swagger 2.0/OAS 2.0 version of Petstore, then click [here](https://editor.swagger.io/?url=https://petstore.swagger.io/v2/swagger.yaml). Alternatively, you can load via the `Edit > Load Petstore OAS 2.0` menu option!_\n\nSome useful links:\n- [The Pet Store repository](https://github.com/swagger-api/swagger-petstore)\n- [The source API definition for the Pet Store](https://github.com/swagger-api/swagger-petstore/blob/master/src/main/resources/openapi.yaml)",
-    "termsOfService": "http://swagger.io/terms/",
-    "contact": {
-      "email": "apiteam@swagger.io"
-    },
-    "license": {
-      "name": "Apache 2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-    },
-    "version": "1.0.11"
+    "description": "This API allows user management for registration, login, password recovery, and profile updates. It supports functionalities like user authentication,  password reset, and user management.",
+    "version": "1.0.0"
   },
   "externalDocs": {
-    "description": "Find out more about Swagger",
-    "url": "http://swagger.io"
+    "description": "Find out more about Flask API",
+    "url": "http://flask.pocoo.org/"
   },
   "tags": [
     {
       "name": "user",
-      "description": "Operations about user"
+      "description": "Operations related to user registration, login, and password management."
     }
   ],
   "paths": {
-    "/user": {
-      "post": {
-        "tags": [
-          "user"
-        ],
-        "summary": "Create user",
-        "description": "This can only be done by the logged in user.",
-        "operationId": "createUser",
-        "requestBody": {
-          "description": "Created user object",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/User"
-              }
-            },
-            "application/xml": {
-              "schema": {
-                "$ref": "#/components/schemas/User"
-              }
-            },
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/User"
-              }
-            }
-          }
-        },
-        "responses": {
-          "default": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/user/createWithList": {
-      "post": {
-        "tags": [
-          "user"
-        ],
-        "summary": "Creates list of users with given input array",
-        "description": "Creates list of users with given input array",
-        "operationId": "createUsersWithListInput",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "successful operation"
-          }
-        }
-      }
-    },
     "/user/login": {
-      "get": {
+      "post": {
         "tags": [
           "user"
         ],
         "summary": "Logs user into the system",
-        "description": "",
+        "description": "Logs in a user by verifying credentials.",
         "operationId": "loginUser",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "query",
-            "description": "The user name for login",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "password",
-            "in": "query",
-            "description": "The password for login in clear text",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "headers": {
-              "X-Rate-Limit": {
-                "description": "calls per hour allowed by the user",
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              },
-              "X-Expires-After": {
-                "description": "date in UTC when token expires",
-                "schema": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              }
-            },
-            "content": {
-              "application/xml": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid username/password supplied"
-          }
-        }
-      }
-    },
-    "/user/logout": {
-      "get": {
-        "tags": [
-          "user"
-        ],
-        "summary": "Logs out current logged in user session",
-        "description": "",
-        "operationId": "logoutUser",
-        "parameters": [],
-        "responses": {
-          "default": {
-            "description": "successful operation"
-          }
-        }
-      }
-    },
-    "/user/{username}": {
-      "get": {
-        "tags": [
-          "user"
-        ],
-        "summary": "Get user by user name",
-        "description": "",
-        "operationId": "getUserByName",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "description": "The name that needs to be fetched. Use user1 for testing. ",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              },
-              "application/xml": {
-                "schema": {
-                  "$ref": "#/components/schemas/User"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid username supplied"
-          },
-          "404": {
-            "description": "User not found"
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "user"
-        ],
-        "summary": "Update user",
-        "description": "This can only be done by the logged in user.",
-        "operationId": "updateUser",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "description": "name that need to be deleted",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
         "requestBody": {
-          "description": "Update an existent user in the store",
+          "description": "User login credentials",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/User"
-              }
-            },
-            "application/xml": {
-              "schema": {
-                "$ref": "#/components/schemas/User"
-              }
-            },
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/User"
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "description": "The username of the user.",
+                    "example": "user1"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "The password of the user.",
+                    "example": "12345"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
-          "default": {
-            "description": "successful operation"
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "correct credentials"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Incorrect credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "wrong credentials"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-      },
-      "delete": {
+      }
+    },
+    "/user/register": {
+      "post": {
         "tags": [
           "user"
         ],
-        "summary": "Delete user",
-        "description": "This can only be done by the logged in user.",
-        "operationId": "deleteUser",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "description": "The name that needs to be deleted",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "summary": "Registers a new user",
+        "description": "Registers a new user with provided details and sends registration form for admin approval.",
+        "operationId": "registerUser",
+        "requestBody": {
+          "description": "New user registration details",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "user1"
+                  },
+                  "email": {
+                    "type": "string",
+                    "example": "user1@email.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "12345"
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "example": "John"
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "example": "Doe"
+                  },
+                  "role": {
+                    "type": "string",
+                    "example": "user"
+                  }
+                }
+              }
             }
           }
-        ],
+        },
         "responses": {
+          "200": {
+            "description": "Registration successful, awaiting admin approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "Registration Form sent to the Administrator, please wait for the approval"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "400": {
-            "description": "Invalid username supplied"
+            "description": "Email or username already used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "Email already used"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/forgotpwd": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Initiates password reset process",
+        "description": "Sends a password reset link to the user email.",
+        "operationId": "forgotPassword",
+        "requestBody": {
+          "description": "Email address for password reset",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "example": "user1@email.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "If a user with the email exists, a reset email is sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "If a user with the email 'user1@email.com' exists, a recovery email has been sent."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/reset_password": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Resets the user password",
+        "description": "Allows a user to reset their password via the reset link.",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "description": "New password",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "example": "newpassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password has been reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password has been changed successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized due to expired or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Token has expired or is invalid"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "User not found"
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "User not found"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -319,42 +291,41 @@
           "id": {
             "type": "integer",
             "format": "int64",
-            "example": 10
+            "example": 1
           },
           "username": {
             "type": "string",
-            "example": "theUser"
+            "example": "user1"
           },
-          "firstName": {
+          "first_name": {
             "type": "string",
             "example": "John"
           },
-          "lastName": {
+          "last_name": {
             "type": "string",
-            "example": "James"
+            "example": "Doe"
           },
           "email": {
             "type": "string",
-            "example": "john@email.com"
+            "example": "user1@email.com"
           },
           "password": {
             "type": "string",
-            "example": "12345"
+            "example": "password123"
           },
-          "phone": {
+          "role": {
             "type": "string",
-            "example": "12345"
-          },
-          "userStatus": {
-            "type": "integer",
-            "description": "User Status",
-            "format": "int32",
-            "example": 1
+            "example": "user"
           }
         },
-        "xml": {
-          "name": "user"
-        }
+        "required": [
+          "username",
+          "password",
+          "email",
+          "first_name",
+          "last_name",
+          "role"
+        ]
       }
     }
   }
