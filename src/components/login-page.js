@@ -98,19 +98,62 @@ function LoginSection({ onChangeSection }) {
 }
 
 function ForgotPasswordSection({ onChangeSection }) {
-    return (
-        <div className="login-section">
-            <div className="login-container">
-                <h1>Forgot Password</h1>
-                <p className="welcome-text" >Enter your email to reset your password.</p>
-                <form>
-                    <input type="email" className="input-field" placeholder="Email" required />
-                    <button type="submit" className="login-button">Reset Password</button>
-                </form>
-                <button onClick={() => onChangeSection("login")} className="login-button">Back to Login</button>
+    const [reset_response , setResetResponse] = useState("")
+    const [email , setEmail] = useState("")
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        const data = { email };
+
+        try {
+            const response = await fetch("/user/forgotpwd", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json", 
+                },
+                body: JSON.stringify(data), 
+            });
+
+            if (response.ok) {
+                const server_response = await response.json();
+                setResetResponse(server_response.message);
+            }
+
+        } catch (error) {
+            console.error("Network error:", error);
+            setResetResponse("Network error, please try again later.");
+        }
+    };  
+
+    if (reset_response == ""){
+        return (
+            <div className="login-section">
+                <div className="login-container">
+                    <h1>Forgot Password</h1>
+                    <p className="welcome-text" >Enter your email to reset your password.</p>
+                    <form onSubmit={handleSubmit}>
+                        <input type="email" className="input-field" placeholder="Email" required onChange={(e) => setEmail(e.target.value)} />
+                        <button type="submit" className="login-button">Reset Password</button>
+                    </form>
+                    <a onClick={() => onChangeSection("login")} > Back to Login</a>
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
+
+    else {
+        return (
+            <div className="login-section">
+                <div className="login-container">
+                    <h1>Forgot Password</h1>
+                    <p className="welcome-text"> {reset_response}</p>
+                    <a onClick={() => onChangeSection("login")} > Back to Login</a>
+                </div>
+            </div>
+        );
+    }
+
 }
 
 function RegisterSection({ onChangeSection }) {
@@ -179,9 +222,9 @@ function RegisterSection({ onChangeSection }) {
                         </select>
                         <button type="submit" className="login-button">Register</button>
                     </form>
-                    <button onClick={() => onChangeSection("login")} className="login-button">
+                    <a onClick={() => onChangeSection("login")} >
                         Back to Login
-                    </button>
+                    </a>
                 </div>
             </div>
         );
