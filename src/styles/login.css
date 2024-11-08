@@ -2,7 +2,7 @@
 * {
     box-sizing: border-box;
 }
-body {
+body , .root{
     background-color: #323840;
     font-family: 'Arial', sans-serif;
     height: 100vh;

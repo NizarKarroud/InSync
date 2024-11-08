@@ -3,17 +3,19 @@ import './styles/login.css'
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
-import { LoginPage } from './components/login/login-page';
+import { LoginPage } from './components/login/loginpage';
 import { ResetPage } from './components/login/reset_password';
-import { Dashboard } from './components/dashboard';
 import { LoginSection } from './components/login/loginsection';
 import { ForgotPasswordSection } from './components/login/forgotpwdsection';
 import { RegisterSection } from './components/login/registersection';
 
-const root = ReactDOM.createRoot(document.body);
+import { Dashboard } from './components/dashboard/dashboard';
+
+const rootElement = document.getElementById('root');
+
+const root = ReactDOM.createRoot(rootElement);
 
 root.render(
-    <React.StrictMode>
         <Router>
             <Routes>
                 <Route path="/" element={<LoginPage />}>
@@ -24,8 +26,9 @@ root.render(
                     <Route path="reset_password" element={<ResetPage />} />
 
                 </Route>
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<Dashboard />} >
+
+                </Route>
             </Routes>
         </Router>
-    </React.StrictMode>
 );
