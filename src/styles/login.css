@@ -2,18 +2,26 @@
 * {
     box-sizing: border-box;
 }
-body , .root{
+
+
+body {
     background-color: #323840;
     font-family: 'Arial', sans-serif;
-    height: 100vh;
+    margin: 0; 
+    padding: 0; 
+}
+
+.root {
     display: flex;
     justify-content: center;
     align-items: center;
+    height: 100vh;
 }
 
 .container {
     display: flex;
     width: 80%;
+    
     height: 80%;
     border-radius: 10px;
     overflow: hidden;
