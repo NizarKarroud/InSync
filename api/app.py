@@ -131,7 +131,7 @@ def forgot_password():
         username = email_availability.username 
         access_token = create_access_token(identity=username , expires_delta= datetime.timedelta(minutes=20))
 
-        reset_link  = "http://" +app.config["FRONTEND_URL"]+ url_for('reset_password', token=access_token)
+        reset_link  = "http://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
     
         html_content = render_template('new-email.html', reset_link=reset_link)
 

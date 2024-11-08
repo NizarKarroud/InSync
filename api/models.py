@@ -46,8 +46,9 @@ class LoginAttempt:
         }
 
 class UserMessage:
-    def __init__(self, room_id, message_text , message_type , attachments):
+    def __init__(self,sender_id, room_id, message_text , message_type , attachments):
         self.room_id = room_id
+        self.sender_id = sender_id
         self.timestamp =  datetime.now(timezone.utc)
         self.message_text = message_text  
         self.message_type = message_type  #"text",  // e.g., text, image, file
@@ -56,6 +57,7 @@ class UserMessage:
     @property
     def json(self):
         return {
+            "sender_id" : self.sender_id,
             "room_id": self.room_id,
             "timestamp": self.timestamp,
             "message_text": self.message_text,
