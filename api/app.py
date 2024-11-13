@@ -2,8 +2,9 @@ from flask import Flask, jsonify, render_template, request , url_for , send_from
 from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo
-from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail , Message
+from flask_socketio import SocketIO, emit
+
 import os
 from werkzeug.security import generate_password_hash , check_password_hash
 from dotenv import load_dotenv
@@ -57,9 +58,65 @@ def send_email(app, msg):
     with app.app_context():
         mail.send(msg)
 
+@app.route("/user/users", methods=["GET"])
+def get_users():
+    query = models.User.query
+
+    username = request.args.get("username")
+    email = request.args.get("email")
+    role = request.args.get("role")
+    account_status = request.args.get("account_status")
+    is_logged = request.args.get("isLogged")
+    first_name = request.args.get("first_name")
+    last_name = request.args.get("last_name")
+    
+    if username:
+        query = query.filter(models.User.username.ilike(f"%{username}%")) 
+    if email:
+        query = query.filter(models.User.email.ilike(f"%{email}%"))
+    if role:
+        query = query.filter(models.User.role == role)
+    if account_status:
+        query = query.filter(models.User.account_status == account_status)
+    if is_logged :
+        query = query.filter(models.User.isLogged == (is_logged.lower() == 'true'))
+    if first_name:
+        query = query.filter(models.User.first_name.ilike(f"%{first_name}%"))
+    if last_name:
+        query = query.filter(models.User.last_name.ilike(f"%{last_name}%"))
+
+    users = query.all()
+
+    user_list = [
+        {
+            "user_id": user.user_id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "created_at": user.created_at,
+            "account_status": user.account_status,
+            "isLogged": user.isLogged,
+            "role": user.role,
+            "profile_picture": user.profile_picture
+        }
+        for user in users
+    ]
+
+    return jsonify(user_list), 200
+
+@app.route("/user/groups" , methods=["GET"])
+@jwt_required()
+def get_user_groups():
+    query = models.User.query
+
+    
+
 @app.route('/user/login' , methods=['POST'])
 def login():
-    data = request.get_json()  
+    data = request.get_json() 
+    user_ip = request.remote_addr
+
     username = data.get('username')
     password = data.get('password')
 
@@ -67,8 +124,12 @@ def login():
     if user_availability : 
         hashed_password = user_availability.password
         if check_password_hash(hashed_password , password):
+            login_attempt = models.LoginAttempt(username , user_ip , True).json
+            mongo.db.login_attempts.insert_one(login_attempt)
             return jsonify({"status" : "correct  credentials"}) , 200
-
+        
+    login_attempt = models.LoginAttempt(username , user_ip , False).json
+    mongo.db.login_attempts.insert_one(login_attempt)
     return jsonify({"status" : "wrong credentials"}) , 401
 
 @app.route('/user/register' , methods=['POST'])
@@ -129,7 +190,8 @@ def forgot_password():
 
     if email_availability :
         username = email_availability.username 
-        access_token = create_access_token(identity=username , expires_delta= datetime.timedelta(minutes=20))
+        user_id = email_availability.user_id
+        access_token = create_access_token(identity={"username": username, "user_id": user_id} , expires_delta= datetime.timedelta(minutes=20))
 
         reset_link  = "http://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
     
@@ -147,9 +209,11 @@ def forgot_password():
 @jwt_required()
 def reset_password():
     current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    
     data = request.get_json()
 
-    user_availability = models.User.query.filter_by(username=current_user).first()
+    user_availability = models.User.query.filter_by(user_id=user_id).first()
 
     if user_availability:
         pwd = data.get("password")

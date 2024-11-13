@@ -34,12 +34,12 @@ class LoginAttempt:
         self.attempt_time = datetime.now(timezone.utc)
         self.username = username
         self.ip_address = ip_address
-        self.success = success   # Whether the attempt was successful
+        self.success = success   
 
     @property
     def json(self):
         return {
-            "attempt_time": self.attempt_time.isoformat(),
+            "attempt_time": self.attempt_time,
             "username": self.username,
             "ip_address": self.ip_address,
             "success": self.success
@@ -52,7 +52,7 @@ class UserMessage:
         self.timestamp =  datetime.now(timezone.utc)
         self.message_text = message_text  
         self.message_type = message_type  #"text",  // e.g., text, image, file
-        self.attachments = attachments  # [ { type: "image", path: "static/files/room_id/file.extension" } ] 
+        self.attachments = attachments  # "static/files/room_id/file.extension" 
     
     @property
     def json(self):
@@ -64,7 +64,6 @@ class UserMessage:
             "message_type": self.message_type,
             "attachments": self.attachments
         }
-
 
 class User(db.Model):
     __tablename__ = "Users"
@@ -78,6 +77,7 @@ class User(db.Model):
     account_status = db.Column(db.String(20), nullable=False) 
     isLogged = db.Column(db.Boolean, default=False, nullable=False)
     role = db.Column(db.String(20) , nullable=False)
+    profile_picture = db.Column(db.String(255), nullable=True)
 
     rooms = db.relationship('Room', secondary='RoomUsers', backref=db.backref('users', lazy='dynamic'))
 
