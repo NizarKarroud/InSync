@@ -37,6 +37,13 @@ export function Chats() {
   const [messages, setMessages] = useState([
     { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
     { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
+    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
+    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
+    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
+    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
+    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
+    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
+    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
   ]);
 
   const handleSectionClick = (section) => {
@@ -115,9 +122,28 @@ export function Chats() {
           <PeopleAlt style={{ color: 'white' }} />
           <Typography style={{ color: 'grey' }}>Friends</Typography>
         </Stack>
+        <Typography style={{ color: 'grey' }}>Direct Messages</Typography>
 
-        <Stack>
-          <Typography style={{ color: 'grey' }}>Direct Messages</Typography>
+        <Stack   style={{
+          maxHeight: '600px',  
+          overflowY: 'auto'    
+        }}
+        sx={{
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: '#32384D', 
+            borderRadius: '10px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#888', 
+            borderRadius: '10px',
+          },
+          '&::-webkit-scrollbar-thumb:hover': {
+            backgroundColor: '#555', 
+          },
+        }}>
 
           {messages.map((message) => (
             <Chat

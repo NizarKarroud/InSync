@@ -108,10 +108,41 @@ def get_users():
 @app.route("/user/groups" , methods=["GET"])
 @jwt_required()
 def get_user_groups():
-    query = models.User.query
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    user_rooms = models.RoomUsers.query.filter_by(user_id=user_id).all()
+
+    if not user_rooms:
+        return jsonify({"message": "User is not a member of any rooms"}), 404
+
+    rooms_data = []
+
+    for room_user in user_rooms:
+        room = models.Room.query.get(room_user.room_id)
+        users_in_room = models.User.query \
+                    .join(models.RoomUsers, models.User.user_id == models.RoomUsers.user_id) \
+                    .filter(models.RoomUsers.room_id == room.room_id, models.User.user_id != user_id).all()
+
+        user_data = []
+        for user in users_in_room:
+            user_data.append({
+                "user_id": user.user_id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "profile_picture": user.profile_picture
+            })
+
+        rooms_data.append({
+            "room_id": room.room_id,
+            "room_type": room.room_type,
+            "users": user_data
+        })
+
+    return jsonify({"rooms": rooms_data}), 200
 
     
-
 @app.route('/user/login' , methods=['POST'])
 def login():
     data = request.get_json() 
@@ -126,8 +157,16 @@ def login():
         if check_password_hash(hashed_password , password):
             login_attempt = models.LoginAttempt(username , user_ip , True).json
             mongo.db.login_attempts.insert_one(login_attempt)
-            return jsonify({"status" : "correct  credentials"}) , 200
-        
+
+            access_token = create_access_token(
+                identity={"user_id": user_availability.user_id, "username": username},
+                expires_delta=datetime.timedelta(hours=24)
+            )
+            
+            response = jsonify({"status": "correct credentials"})
+            response.headers['Authorization'] = f"Bearer {access_token}"
+            return response, 200
+                
     login_attempt = models.LoginAttempt(username , user_ip , False).json
     mongo.db.login_attempts.insert_one(login_attempt)
     return jsonify({"status" : "wrong credentials"}) , 401
