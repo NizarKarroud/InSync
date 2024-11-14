@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "InSync API",
-    "description": "This API allows user management for registration, login, password recovery, and profile updates. It supports functionalities like user authentication,  password reset, and user management.",
+    "description": "This API allows user management for registration, login, password recovery, profile updates, and user group management. It supports functionalities like user authentication,  password reset, file downloads, and user and group retrieval.",
     "version": "1.0.0"
   },
   "externalDocs": {
@@ -12,7 +12,7 @@
   "tags": [
     {
       "name": "user",
-      "description": "Operations related to user registration, login, and password management."
+      "description": "Operations related to user registration, login, password management, and group management."
     }
   ],
   "paths": {
@@ -21,8 +21,8 @@
         "tags": [
           "user"
         ],
-        "summary": "Logs user into the system",
-        "description": "Logs in a user by verifying credentials.",
+        "summary": "Logs user into the web app",
+        "description": "Logs in a user by verifying credentials and generates a JWT token on success.",
         "operationId": "loginUser",
         "requestBody": {
           "description": "User login credentials",
@@ -49,6 +49,14 @@
         "responses": {
           "200": {
             "description": "Login successful",
+            "headers": {
+              "Authorization": {
+                "description": "JWT token for authentication",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -119,7 +127,7 @@
                   },
                   "role": {
                     "type": "string",
-                    "example": "user"
+                    "example": "student"
                   }
                 }
               }
@@ -144,7 +152,7 @@
             }
           },
           "400": {
-            "description": "Email or username already used",
+            "description": "Email or Username already used",
             "content": {
               "application/json": {
                 "schema": {
@@ -212,7 +220,7 @@
           "user"
         ],
         "summary": "Resets the user password",
-        "description": "Allows a user to reset their password via the reset link.",
+        "description": "Allows a user to reset their password via the reset link. The reset token should be passed in the query parameter .",
         "operationId": "resetPassword",
         "requestBody": {
           "description": "New password",
@@ -256,7 +264,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Token has expired or is invalid"
+                      "example": "Token has expired"
                     }
                   }
                 }
@@ -281,6 +289,229 @@
           }
         }
       }
+    },
+    "/user/users": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Retrieve users",
+        "description": "Retrieves a list of users with filtering options.",
+        "operationId": "getUsers",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "description": "Filter by username",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "Filter by email",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "Filter by role",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_status",
+            "in": "query",
+            "description": "Filter by account status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isLogged",
+            "in": "query",
+            "description": "Filter by login status",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/groups": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Retrieve user groups",
+        "description": "Retrieves groups associated with the user. Please make sure to include the JWT token in the Authorization header as a Bearer token to access this endpoint",
+        "operationId": "getUserGroups",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of user groups",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rooms": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "room_id": {
+                            "type": "integer"
+                          },
+                          "room_type": {
+                            "type": "string"
+                          },
+                          "users": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "user_id": {
+                                  "type": "integer"
+                                },
+                                "username": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                },
+                                "first_name": {
+                                  "type": "string"
+                                },
+                                "last_name": {
+                                  "type": "string"
+                                },
+                                "profile_picture": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized due to expired or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Token has expired"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User is not a member of any rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "User is not a member of any rooms"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/uploads/{name}": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Download a file",
+        "description": "Allows users to download a file from the uploads folder.",
+        "operationId": "downloadFile",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "description": "Name of the file to download",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File downloaded successfully",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "File not found"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -288,9 +519,8 @@
       "User": {
         "type": "object",
         "properties": {
-          "id": {
+          "user_id": {
             "type": "integer",
-            "format": "int64",
             "example": 1
           },
           "username": {
@@ -309,13 +539,21 @@
             "type": "string",
             "example": "user1@email.com"
           },
-          "password": {
-            "type": "string",
-            "example": "password123"
-          },
           "role": {
             "type": "string",
             "example": "user"
+          },
+          "account_status": {
+            "type": "string",
+            "example": "active"
+          },
+          "isLogged": {
+            "type": "boolean",
+            "example": true
+          },
+          "profile_picture": {
+            "type": "string",
+            "example": "profile.jpg"
           }
         },
         "required": [
@@ -326,6 +564,13 @@
           "last_name",
           "role"
         ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   }
