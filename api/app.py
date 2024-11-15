@@ -155,16 +155,24 @@ def login():
     if user_availability : 
         hashed_password = user_availability.password
         if check_password_hash(hashed_password , password):
+            if user_availability.isLogged:
+                login_attempt = models.LoginAttempt(username , user_ip , False).json
+                mongo.db.login_attempts.insert_one(login_attempt)
+                return jsonify({"status": "User is already logged in"}), 403
+                
             login_attempt = models.LoginAttempt(username , user_ip , True).json
             mongo.db.login_attempts.insert_one(login_attempt)
+
 
             access_token = create_access_token(
                 identity={"user_id": user_availability.user_id, "username": username},
                 expires_delta=datetime.timedelta(hours=24)
             )
-            
+
             response = jsonify({"status": "correct credentials"})
             response.headers['Authorization'] = f"Bearer {access_token}"
+            user_availability.isLogged = True
+            models.db.session.commit()
             return response, 200
                 
     login_attempt = models.LoginAttempt(username , user_ip , False).json
