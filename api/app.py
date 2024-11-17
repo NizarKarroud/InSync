@@ -13,16 +13,18 @@ import models
 import datetime 
 
 
-
 load_dotenv()
 
 app = Flask(__name__)
+
 
 app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URI")
 
 app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'chatapp', 'api', 'uploads')
+
+app_dir = os.path.dirname(os.path.realpath(__file__))
 
 models.db.init_app(app)  
 
@@ -105,44 +107,96 @@ def get_users():
 
     return jsonify(user_list), 200
 
-@app.route("/user/groups" , methods=["GET"])
+@app.route("/user/groups", methods=["GET"])
 @jwt_required()
 def get_user_groups():
+    # Get current user's ID from JWT token
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
-    user_rooms = models.RoomUsers.query.filter_by(user_id=user_id).all()
 
-    if not user_rooms:
-        return jsonify({"message": "User is not a member of any rooms"}), 404
+    # Fetch all group rooms the current user is part of
+    group_room_users = models.RoomUsers.query \
+        .join(models.Room, models.Room.room_id == models.RoomUsers.room_id) \
+        .filter(models.RoomUsers.user_id == user_id, models.Room.room_type == "group") \
+        .all()
 
-    rooms_data = []
+    if not group_room_users:
+        return jsonify({"message": "User is not a member of any group rooms"}), 404
 
-    for room_user in user_rooms:
+    group_rooms = []
+    for room_user in group_room_users:
         room = models.Room.query.get(room_user.room_id)
-        users_in_room = models.User.query \
-                    .join(models.RoomUsers, models.User.user_id == models.RoomUsers.user_id) \
-                    .filter(models.RoomUsers.room_id == room.room_id, models.User.user_id != user_id).all()
 
-        user_data = []
-        for user in users_in_room:
-            user_data.append({
+        users_in_room = models.User.query \
+            .join(models.RoomUsers, models.User.user_id == models.RoomUsers.user_id) \
+            .filter(models.RoomUsers.room_id == room.room_id, models.User.user_id != user_id) \
+            .all()
+
+        user_data = [
+            {
                 "user_id": user.user_id,
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
                 "profile_picture": user.profile_picture
-            })
+            }
+            for user in users_in_room
+        ]
 
-        rooms_data.append({
+        group_rooms.append({
             "room_id": room.room_id,
-            "room_type": room.room_type,
+            "room_name": room.room_name,
             "users": user_data
         })
 
-    return jsonify({"rooms": rooms_data}), 200
+    return jsonify({"group_rooms": group_rooms}), 200
 
-    
+@app.route("/user/dms", methods=["GET"])
+@jwt_required()
+def get_user_dms():
+    # Get current user's ID from JWT token
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+
+    # Fetch all direct rooms the current user is part of
+    direct_room_users = models.RoomUsers.query \
+        .join(models.Room, models.Room.room_id == models.RoomUsers.room_id) \
+        .filter(models.RoomUsers.user_id == user_id, models.Room.room_type == "direct") \
+        .all()
+
+    if not direct_room_users:
+        return jsonify({"message": "User is not a member of any direct message rooms"}), 404
+
+    direct_rooms = []
+    for room_user in direct_room_users:
+        room = models.Room.query.get(room_user.room_id)
+
+        users_in_room = models.User.query \
+            .join(models.RoomUsers, models.User.user_id == models.RoomUsers.user_id) \
+            .filter(models.RoomUsers.room_id == room.room_id, models.User.user_id != user_id) \
+            .all()
+
+        user_data = [
+            {
+                "user_id": user.user_id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "profile_picture": user.profile_picture
+            }
+            for user in users_in_room
+        ]
+
+        direct_rooms.append({
+            "room_id": room.room_id,
+            "users": user_data
+        })
+
+    return jsonify({"direct_rooms": direct_rooms}), 200
+
+        
 @app.route('/user/login' , methods=['POST'])
 def login():
     data = request.get_json() 
@@ -155,11 +209,6 @@ def login():
     if user_availability : 
         hashed_password = user_availability.password
         if check_password_hash(hashed_password , password):
-            if user_availability.isLogged:
-                login_attempt = models.LoginAttempt(username , user_ip , False).json
-                mongo.db.login_attempts.insert_one(login_attempt)
-                return jsonify({"status": "User is already logged in"}), 403
-                
             login_attempt = models.LoginAttempt(username , user_ip , True).json
             mongo.db.login_attempts.insert_one(login_attempt)
 
@@ -240,7 +289,7 @@ def forgot_password():
         user_id = email_availability.user_id
         access_token = create_access_token(identity={"username": username, "user_id": user_id} , expires_delta= datetime.timedelta(minutes=20))
 
-        reset_link  = "http://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
+        reset_link  = "https://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
     
         html_content = render_template('new-email.html', reset_link=reset_link)
 
@@ -274,6 +323,6 @@ def reset_password():
         return jsonify({"message": "User not found"}), 404
         
 if __name__ == '__main__':
-    app.run('0.0.0.0', 16000 , debug=True)
+    app.run('0.0.0.0', 16000 , debug=True , ssl_context=(os.path.join(app_dir, 'cert.pem'), os.path.join(app_dir, 'key.pem')))
 
 

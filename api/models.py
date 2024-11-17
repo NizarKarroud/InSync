@@ -85,7 +85,9 @@ class Room(db.Model):
     __tablename__ = "Rooms"
     room_id = db.Column(db.Integer, primary_key=True , autoincrement=True)
     room_type = db.Column(db.String(10) , nullable=False)
-    
+    room_name = db.Column(db.String(50), nullable=True)  # Nullable for direct rooms (dms)
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), nullable=False)
+    room_picture = db.Column(db.String(255), nullable=True)
 
 class RoomUsers(db.Model):
     __tablename__ = "RoomUsers"

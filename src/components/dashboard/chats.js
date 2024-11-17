@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState , useEffect} from "react";
 import { Box, Divider, Stack, TextField, Typography  , Avatar} from "@mui/material";
 import { PeopleAlt, ListAlt } from '@mui/icons-material';
 import React from 'react';
@@ -32,24 +32,46 @@ function Chat({ senderName, message, avatarColor, initial }) {
 }
 
 
-export function Chats() {
-
-  const [messages, setMessages] = useState([
-    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
-    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
-    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
-    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
-    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
-    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
-    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
-    { id: 1, senderName: 'Alice', message: 'Hey, hru ?', avatarColor: '#4A90E2', initial: 'A' },
-    { id: 2, senderName: 'Bob', message: 'Hmmmmmm', avatarColor: '#FF6347', initial: 'B' },
-  ]);
+export function Chats({token}) {
+  const [dms, setDms] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const handleSectionClick = (section) => {
-    console.log(`${section} section clicked!`);
-  };
+      console.log(`${section} section clicked!`);
+    };
 
+  useEffect(() => {
+      const fetchDms = async () => {
+          try {
+              const response = await fetch("/user/dms", {
+                  method: "GET",
+                  headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${token}`,
+                  },
+              });
+
+              if (response.ok) {
+                  const data = await response.json();
+                  setDms(data.direct_rooms);
+              } else {
+                  console.error(`Failed to fetch DMs, status: ${response.status}`);
+              }
+          } catch (error) {
+              console.error("Fetch error:", error);
+          } finally {
+              setLoading(false);
+          }
+      };
+
+      if (token) {
+          fetchDms();
+      }
+  }, [token]);
+
+  if (loading) {
+      return null;
+  }
   return (
     <Box
       sx={{
@@ -127,8 +149,8 @@ export function Chats() {
         <Stack   style={{
           maxHeight: '600px',  
           overflowY: 'auto'    
-        }}
-        sx={{
+          }}
+          sx={{
           '&::-webkit-scrollbar': {
             width: '8px',
           },
@@ -143,16 +165,16 @@ export function Chats() {
           '&::-webkit-scrollbar-thumb:hover': {
             backgroundColor: '#555', 
           },
-        }}>
+          }}>
 
-          {messages.map((message) => (
-            <Chat
-              key={message.id}
-              senderName={message.senderName}
-              message={message.message}
-              avatarColor={message.avatarColor}
-              initial={message.initial}
-            />
+          {dms.map((dm, index) => (
+                        <Chat
+                            key={index}
+                            senderName={dm.users[0].username}
+                            message={`Chat with ${dm.users[0].username}`}
+                            avatarColor="#4A90E2"
+                            initial={dm.users[0].username[0]}
+                        />
           ))}
         </Stack>
       </Stack>
