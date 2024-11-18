@@ -25,16 +25,16 @@ export function LoginSection() {
                 const errorData = await response.json();
                 setStatus(errorData.status);
                 console.error("Login failed:", errorData.status);
-            } else {
-                const logged = await response.json();
-                setStatus(logged.status);
-                
+            }   
+            else {
+                const user = await response.json();                
                 const token = response.headers.get("Authorization")?.replace("Bearer ", "");
 
                 if (token) {
                     localStorage.setItem("token", token);
-                    
-                    navigate("/dashboard");
+                    console.log("User before navigating:", user);
+
+                    navigate("/dashboard", { state: { user: user.user } });
                 }
             }
         } catch (error) {

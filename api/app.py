@@ -22,7 +22,7 @@ app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URI")
 
-app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'chatapp', 'api', 'uploads')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files')
 
 app_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -218,7 +218,25 @@ def login():
                 expires_delta=datetime.timedelta(hours=24)
             )
 
-            response = jsonify({"status": "correct credentials"})
+            # Prepare user data to return
+            user_data = {
+                "user_id": user_availability.user_id,
+                "username": user_availability.username,
+                "email": user_availability.email,
+                "first_name": user_availability.first_name,
+                "last_name": user_availability.last_name,
+                "account_status": user_availability.account_status,
+                "role": user_availability.role,
+                "profile_picture": user_availability.profile_picture,
+                "isLogged": user_availability.isLogged,
+                "created_at": user_availability.created_at.isoformat()
+            }
+
+            # Construct response
+            response = jsonify({
+                "user": user_data
+            })
+
             response.headers['Authorization'] = f"Bearer {access_token}"
             user_availability.isLogged = True
             models.db.session.commit()
