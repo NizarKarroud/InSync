@@ -1,9 +1,12 @@
-from flask import Flask, jsonify, render_template, request , url_for , send_from_directory
+from flask import Flask, jsonify, render_template, request , url_for , send_from_directory , send_file
 from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo
 from flask_mail import Mail , Message
 from flask_socketio import SocketIO, emit
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_cors import CORS
 
 import os
 from werkzeug.security import generate_password_hash , check_password_hash
@@ -17,14 +20,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
+CORS(app)
 
 app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URI")
 
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files' )
 
-app_dir = os.path.dirname(os.path.realpath(__file__))
+app.config['USERS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "users" )
 
 models.db.init_app(app)  
 
@@ -55,12 +59,42 @@ swaggerui_blueprint = get_swaggerui_blueprint(
 
 app.register_blueprint(swaggerui_blueprint)
 
+limiter = Limiter(get_remote_address, app=app)
+
 
 def send_email(app, msg):
     with app.app_context():
         mail.send(msg)
 
+@app.route("/user/current", methods=["GET"])
+@jwt_required()
+@limiter.limit("20 per minute")  
+def get_current_user():
+    current_user = get_jwt_identity()
+    
+    user_id = current_user.get("user_id")
+    user = models.User.query.filter_by(user_id=user_id).first()
+    
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    
+    user_data = {
+        "user_id": user.user_id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "account_status": user.account_status,
+        "role": user.role,
+        "profile_picture": user.profile_picture,
+        "isLogged": user.isLogged,
+        "created_at": user.created_at.isoformat()
+    }
+    
+    return jsonify({"user": user_data}), 200
+
 @app.route("/user/users", methods=["GET"])
+@limiter.limit("5 per minute") 
 def get_users():
     query = models.User.query
 
@@ -109,6 +143,7 @@ def get_users():
 
 @app.route("/user/groups", methods=["GET"])
 @jwt_required()
+@limiter.limit("5 per minute") 
 def get_user_groups():
     # Get current user's ID from JWT token
     current_user = get_jwt_identity()
@@ -154,6 +189,7 @@ def get_user_groups():
 
 @app.route("/user/dms", methods=["GET"])
 @jwt_required()
+@limiter.limit("10 per minute") 
 def get_user_dms():
     # Get current user's ID from JWT token
     current_user = get_jwt_identity()
@@ -195,9 +231,9 @@ def get_user_dms():
         })
 
     return jsonify({"direct_rooms": direct_rooms}), 200
-
-        
+      
 @app.route('/user/login' , methods=['POST'])
+@limiter.limit("5 per minute") 
 def login():
     data = request.get_json() 
     user_ip = request.remote_addr
@@ -218,23 +254,9 @@ def login():
                 expires_delta=datetime.timedelta(hours=24)
             )
 
-            # Prepare user data to return
-            user_data = {
-                "user_id": user_availability.user_id,
-                "username": user_availability.username,
-                "email": user_availability.email,
-                "first_name": user_availability.first_name,
-                "last_name": user_availability.last_name,
-                "account_status": user_availability.account_status,
-                "role": user_availability.role,
-                "profile_picture": user_availability.profile_picture,
-                "isLogged": user_availability.isLogged,
-                "created_at": user_availability.created_at.isoformat()
-            }
-
             # Construct response
             response = jsonify({
-                "user": user_data
+                "status": "correct credentials"
             })
 
             response.headers['Authorization'] = f"Bearer {access_token}"
@@ -247,6 +269,7 @@ def login():
     return jsonify({"status" : "wrong credentials"}) , 401
 
 @app.route('/user/register' , methods=['POST'])
+@limiter.limit("2 per minute") 
 def register():
     data = request.get_json()
 
@@ -283,14 +306,64 @@ def register():
 
     return jsonify({"status" : "Registration Form sent to the Administrator , please wait for the approval"}), 200
 
-@app.route("/uploads/<path:name>")
+@app.route('/user/update', methods=['PUT'])
+@jwt_required()
+@limiter.limit("2 per minute")  
+def update_user():
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    
+    data = request.get_json()
+
+    username = data.get("username")
+    email = data.get("email")
+
+    user = models.User.query.filter_by(user_id=user_id).first()
+
+    if not user:
+        return jsonify({"status": "User not found"}), 404
+
+    if username and username != user.username:
+        username_availability = models.User.query.filter_by(username=username).first()
+        if username_availability:
+            return jsonify({"status": "Username already in use"}), 400
+        user.username = username
+
+    if email and email != user.email:
+        email_availability = models.User.query.filter_by(email=email).first()
+        if email_availability:
+            return jsonify({"status": "Email already in use"}), 400
+        user.email = email
+
+    models.db.session.commit()
+
+    updated_user = {
+        "user_id": user.user_id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "account_status": user.account_status,
+        "isLogged": user.isLogged,
+        "created_at": user.created_at.isoformat()
+    }
+    access_token = create_access_token(identity={"username": user.username, "user_id": user_id} , expires_delta= datetime.timedelta(minutes=20))
+    response = jsonify({"status": "User updated successfully", "user": updated_user})
+    response.headers['Authorization'] = f"Bearer {access_token}"
+
+    return response , 200
+
+
+@app.route("/users/<path:name>")
 def download_file(name):
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], name, as_attachment=True)
+        return send_from_directory(app.config['USERS_FOLDER'], name)
     except FileNotFoundError:
         pass
 
 @app.route('/user/forgotpwd' , methods=['POST'])
+@limiter.limit("2 per minute") 
 def forgot_password():
     data = request.get_json()
     user_email = data.get("email")
@@ -321,6 +394,7 @@ def forgot_password():
 
 @app.route('/user/reset_password' , methods=['POST'])
 @jwt_required()
+@limiter.limit("2 per minute") 
 def reset_password():
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
@@ -341,6 +415,6 @@ def reset_password():
         return jsonify({"message": "User not found"}), 404
         
 if __name__ == '__main__':
-    app.run('0.0.0.0', 16000 , debug=True , ssl_context=(os.path.join(app_dir, 'cert.pem'), os.path.join(app_dir, 'key.pem')))
+    app.run('0.0.0.0', 16000 , debug=True , ssl_context=(os.path.join(app.root_path, 'cert.pem'), os.path.join(app.root_path, 'key.pem')))
 
 

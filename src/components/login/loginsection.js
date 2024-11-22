@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import React, { useState } from "react";
+import { useMutation } from '@tanstack/react-query';
 
 export function LoginSection() {
     const [username, setUsername] = useState("");
@@ -7,12 +8,8 @@ export function LoginSection() {
     const [status, setStatus] = useState("");
     const navigate = useNavigate();
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        const data = { username, password };
-
-        try {
+    const mutation = useMutation({
+        mutationFn: async (data) => {
             const response = await fetch("/user/login", {
                 method: "POST",
                 headers: {
@@ -20,27 +17,34 @@ export function LoginSection() {
                 },
                 body: JSON.stringify(data),
             });
-
+    
             if (!response.ok) {
                 const errorData = await response.json();
-                setStatus(errorData.status);
-                console.error("Login failed:", errorData.status);
-            }   
-            else {
-                const user = await response.json();                
-                const token = response.headers.get("Authorization")?.replace("Bearer ", "");
-
-                if (token) {
-                    localStorage.setItem("token", token);
-                    console.log("User before navigating:", user);
-
-                    navigate("/dashboard", { state: { user: user.user } });
-                }
+                throw new Error(errorData.status || "Login failed"); 
             }
-        } catch (error) {
-            console.error("Network error:", error);
-            setStatus("Network error, please try again later.");
-        }
+    
+            const token = response.headers.get("Authorization")?.replace("Bearer ", ""); 
+            return { token }; 
+        },
+        onSuccess: ({ token }) => {
+            if (token) {
+                localStorage.setItem("token", token);
+
+                navigate("/dashboard");
+            }
+        },
+        onError: (error) => {
+            setStatus(error.message); 
+        },
+    });
+    
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        
+        const data = { username, password };
+        
+        mutation.mutate(data); 
     };
 
     if (status === "") {
@@ -67,7 +71,9 @@ export function LoginSection() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
-                        <button type="submit" className="login-button">Login</button>
+                        <button type="submit" className="login-button" disabled={mutation.isLoading}>
+                            {mutation.isLoading ? 'Logging in...' : 'Login'}
+                        </button>
                     </form>
                     <div className="links">
                         <Link to="/forgotPassword">Forgot Password?</Link>
