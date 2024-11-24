@@ -7,15 +7,10 @@ import {
   Typography,
   Avatar,
   IconButton,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Button,
+  CircularProgress,
 } from "@mui/material";
 import { PeopleAlt, ListAlt, SettingsOutlined } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
-import CircularProgress from "@mui/material/CircularProgress";
 import { UserProfileDialog } from "./settingdial";
 
 const fetchDms = async (token) => {
@@ -35,23 +30,6 @@ const fetchDms = async (token) => {
   return data.direct_rooms;
 };
 
-const fetchUsers = async (token) => {
-  const response = await fetch("/user/users", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch users, status: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data; 
-};
-
 function DM({ senderName, message, avatarColor, initial }) {
   return (
     <Stack
@@ -64,7 +42,7 @@ function DM({ senderName, message, avatarColor, initial }) {
         borderRadius: "10px",
         padding: 1,
         transition: "background-color 0.3s",
-        "&:hover": { backgroundColor: "#4B5677" },
+        "&:hover": { backgroundColor: "#5E3F75" }, 
       }}
     >
       <Avatar sx={{ width: 30, height: 30, backgroundColor: avatarColor }}>
@@ -82,9 +60,7 @@ function DM({ senderName, message, avatarColor, initial }) {
   );
 }
 
-export function Dms({ user, token, onSelectChat , refetchUser  }) {
-
-
+export function Dms({ user, token, onSelectChat, refetchUser }) {
   const { data: dms, isLoading, isError, error } = useQuery({
     queryKey: ["dms", token],
     queryFn: () => fetchDms(token),
@@ -93,22 +69,12 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
 
   const [openProfile, setOpenProfile] = useState(false);
 
-  const handleSettingsClick = () => {
-    setOpenProfile(true);
-  };
-
-  const handleCloseProfile = () => {
-    setOpenProfile(false);
-  };
-
-
-  const handleSectionClick = (section) => {
-    console.log(`${section} section clicked!`);
-  };
+  const handleSettingsClick = () => setOpenProfile(true);
+  const handleCloseProfile = () => setOpenProfile(false);
 
   if (isLoading) {
     return (
-      <Box sx={{ display: "flex" }}>
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
         <CircularProgress />
       </Box>
     );
@@ -118,14 +84,12 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
     return <div>Error: {error.message}</div>;
   }
 
-  console.log("user is : " , user)
-
   return (
     <Box
       sx={{
         height: "100vh",
         width: 280,
-        backgroundColor: "#32384D",
+        backgroundColor: "#1E2326",
         boxShadow: "0px 0px 2px rgba(0, 0, 0, 0.25)",
         display: "flex",
         flexDirection: "column",
@@ -136,22 +100,16 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
       <Stack sx={{ padding: 2, flex: 1, overflow: "hidden" }}>
         <TextField
           placeholder="Search"
-          color="grey"
-          focused
           variant="outlined"
           size="small"
           sx={{
             marginBottom: 2,
             "& .MuiOutlinedInput-root": {
-              backgroundColor: "#282F41",
+              backgroundColor: "#333841",
               borderRadius: "20px",
               paddingX: 1,
-              "& fieldset": {
-                borderColor: "transparent",
-              },
-              "&:hover fieldset": {
-                borderColor: "rgba(255, 255, 255, 0.5)",
-              },
+              "& fieldset": { borderColor: "transparent" },
+              "&:hover fieldset": { borderColor: "rgba(255, 255, 255, 0.5)" },
             },
             "& .MuiOutlinedInput-input": {
               color: "white",
@@ -159,7 +117,7 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
             },
           }}
         />
-        <Divider sx={{ borderBottomWidth: 2 }} />
+        <Divider sx={{ borderBottomWidth: 2, borderColor: "#5E3F75" }} />
 
         <Stack
           direction={"row"}
@@ -171,9 +129,8 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
             cursor: "pointer",
             borderRadius: "10px",
             transition: "background-color 0.3s",
-            "&:hover": { backgroundColor: "#4B5677" },
+            "&:hover": { backgroundColor: "#5E3F75" },
           }}
-          onClick={() => handleSectionClick("Users")}
         >
           <ListAlt style={{ color: "white" }} />
           <Typography style={{ color: "grey" }}>Users</Typography>
@@ -189,9 +146,8 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
             cursor: "pointer",
             borderRadius: "10px",
             transition: "background-color 0.3s",
-            "&:hover": { backgroundColor: "#4B5677" },
+            "&:hover": { backgroundColor: "#5E3F75" },
           }}
-          onClick={() => handleSectionClick("Friends")}
         >
           <PeopleAlt style={{ color: "white" }} />
           <Typography style={{ color: "grey" }}>Friends</Typography>
@@ -209,15 +165,15 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
               width: "8px",
             },
             "&::-webkit-scrollbar-track": {
-              backgroundColor: "#32384D",
+              backgroundColor: "#1E2326",  
               borderRadius: "10px",
             },
             "&::-webkit-scrollbar-thumb": {
-              backgroundColor: "#888",
+              backgroundColor: "#5E3F75",
               borderRadius: "10px",
             },
             "&::-webkit-scrollbar-thumb:hover": {
-              backgroundColor: "#555",
+              backgroundColor: "#4A3A60",
             },
           }}
         >
@@ -226,7 +182,7 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
               key={index}
               senderName={dm.users[0].username}
               message={`Chat with ${dm.users[0].username}`}
-              avatarColor="#4A90E2"
+              avatarColor="#5E3F75"
               initial={dm.users[0].username[0]}
             />
           ))}
@@ -237,21 +193,21 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
       <Box
         sx={{
           padding: 2,
-          backgroundColor: "#282F41",
+          backgroundColor: "#2D2F32",
           display: "flex",
           alignItems: "center",
           borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+          
         }}
       >
         <Avatar
           sx={{
-            backgroundColor: user.profile_picture ? "transparent" : "#4A90E2",
+            backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
             width: 40,
             height: 40,
             marginRight: 2,
           }}
           src={user?.profile_picture ? `https://localhost:16000/users/${user.profile_picture}` : ""}
-          alt={`${user.first_name} ${user.last_name}`}
         >
           {!user.profile_picture && (user.username[0]).toUpperCase()}
         </Avatar>
@@ -259,7 +215,7 @@ export function Dms({ user, token, onSelectChat , refetchUser  }) {
         <Typography sx={{ color: "white", fontWeight: "bold", marginRight: 1 }}>
           {user.username}
         </Typography>
-        <IconButton onClick={handleSettingsClick} sx={{ color: "white", ml: 'auto' }}>
+        <IconButton onClick={handleSettingsClick} sx={{ color: "white", ml: "auto" }}>
           <SettingsOutlined />
         </IconButton>
       </Box>

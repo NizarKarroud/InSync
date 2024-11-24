@@ -1,183 +1,259 @@
-import { useState , useEffect} from "react";
-import { Box, Divider, Stack, TextField, Typography  , Avatar} from "@mui/material";
-import { PeopleAlt, ListAlt } from '@mui/icons-material';
-import React from 'react';
+import React, { useState, useEffect } from "react";
+import {
+    Box,
+    IconButton,
+    TextField,
+    Typography,
+    Avatar,
+    Stack,
+    Divider,
+} from "@mui/material";
+import {
+    Call,
+    Videocam,
+    MoreVert,
+    InsertEmoticon,
+    AttachFile,
+    Send,
+} from "@mui/icons-material";
 
-function Chat({ senderName, message, avatarColor, initial }) {
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={2}
-      sx={{
-        marginTop: 2,
-        cursor: "pointer",
-        borderRadius: "10px",
-        padding: 1,
-        transition: "background-color 0.3s",
-        "&:hover": { backgroundColor: "#4B5677" },
-      }}
-    >
-      <Avatar sx={{ width: 30, height: 30, backgroundColor: avatarColor }}>
-        {initial}
-      </Avatar>
-      <Box>
-        <Typography style={{ color: 'white', fontWeight: 'bold' }}>{senderName}</Typography>
-        <Typography style={{ color: 'grey', fontSize: '0.875rem' }}>
-          {message}
-        </Typography>
-      </Box>
-    </Stack>
-  );
-}
+const fetchMessages = async (chatId, token) => {
+    const response = await fetch(`/chats/${chatId}/messages`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        },
+    });
 
+    if (!response.ok) {
+        throw new Error(`Failed to fetch messages, status: ${response.status}`);
+    }
 
-export function Chats({token}) {
-  const [dms, setDms] = useState([]);
-  const [loading, setLoading] = useState(true);
+    const data = await response.json();
+    return data.messages;
+};
 
-  const handleSectionClick = (section) => {
-      console.log(`${section} section clicked!`);
+export function Chats({ selectedChat, user, token }) {
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState("");
+
+    useEffect(() => {
+        const fetchChatMessages = async () => {
+            try {
+                const messages = await fetchMessages(selectedChat.room_id, token);
+                setMessages(messages);
+            } catch (error) {
+                console.error("Error fetching messages:", error);
+            }
+        };
+
+        fetchChatMessages();
+    }, [selectedChat, token]);
+
+    const handleSendMessage = async () => {
+        if (!newMessage.trim()) return;
+
+        const response = await fetch(`/chats/${selectedChat.room_id}/messages`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ message: newMessage }),
+        });
+
+        if (response.ok) {
+            const sentMessage = await response.json();
+            setMessages((prev) => [...prev, sentMessage]);
+            setNewMessage("");
+        } else {
+            console.error("Failed to send message");
+        }
     };
 
-  useEffect(() => {
-      const fetchDms = async () => {
-          try {
-              const response = await fetch("/user/dms", {
-                  method: "GET",
-                  headers: {
-                      "Content-Type": "application/json",
-                      "Authorization": `Bearer ${token}`,
-                  },
-              });
-
-              if (response.ok) {
-                  const data = await response.json();
-                  setDms(data.direct_rooms);
-              } else {
-                  console.error(`Failed to fetch DMs, status: ${response.status}`);
-              }
-          } catch (error) {
-              console.error("Fetch error:", error);
-          } finally {
-              setLoading(false);
-          }
-      };
-
-      if (token) {
-          fetchDms();
-      }
-  }, [token]);
-
-  if (loading) {
-      return null;
-  }
-  return (
-    <Box
-      sx={{
-        height: "100vh",
-        width: 280,
-        backgroundColor: "#32384D",
-        boxShadow: "0px 0px 2px rgba(0, 0, 0, 0.25)",
-      }}
-    >
-      <Stack sx={{ padding: 2 }}>
-        <TextField
-          placeholder="Search"
-          color="grey"
-          focused
-          variant="outlined"
-          size="small"
-          sx={{
-            marginBottom: 2,
-            '& .MuiOutlinedInput-root': {
-              backgroundColor: '#282F41',
-              borderRadius: '20px',
-              paddingX: 1,
-              '& fieldset': {
-                borderColor: 'transparent',
-              },
-              '&:hover fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.5)',
-              },
-            },
-            '& .MuiOutlinedInput-input': {
-              color: 'white',
-              paddingY: 0.5,
-            },
-          }}
-        />
-        <Divider sx={{ borderBottomWidth: 2 }} />
-
-        <Stack
-          direction={"row"}
-          alignContent={"center"}
-          spacing={1.5}
-          sx={{
-            marginTop: 2,
-            marginBottom: 1,
-            cursor: "pointer",
-            borderRadius: "10px",
-            transition: "background-color 0.3s",
-            "&:hover": { backgroundColor: "#4B5677" },
-          }}
-          onClick={() => handleSectionClick('Users')}
+    return (
+        <Box
+            sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "#2D2F33", // Primary background
+                color: "white",
+                height: "100%",
+                overflow: "hidden",
+            }}
         >
-          <ListAlt style={{ color: 'white' }} />
-          <Typography style={{ color: 'grey' }}>Users</Typography>
-        </Stack>
+            {/* Compact Top Header */}
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 16px",
+                    backgroundColor: "#333841",
+                    borderBottom: "1px solid #444", 
+                }}
+            >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                    <Avatar sx={{ bgcolor: "#5E3F75" }}>{selectedChat.room_name[0]}</Avatar>
+                    <Box>
+                        <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: "bold", color: "white" }}
+                        >
+                            {selectedChat.room_name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
+                            Last active 10 mins ago
+                        </Typography>
+                    </Box>
+                </Stack>
+                <Stack direction="row" spacing={1}>
+                    <IconButton sx={{ color: "#5E3F75" }}>
+                        <Call />
+                    </IconButton>
+                    <IconButton sx={{ color: "#5E3F75" }}>
+                        <Videocam />
+                    </IconButton>
+                    <IconButton sx={{ color: "#5E3F75" }}>
+                        <MoreVert />
+                    </IconButton>
+                </Stack>
+            </Box>
 
-        <Stack
-          direction={"row"}
-          alignContent={"center"}
-          spacing={1.5}
-          sx={{
-            marginTop: 1,
-            marginBottom: 4,
-            cursor: "pointer",
-            borderRadius: "10px",
-            transition: "background-color 0.3s",
-            "&:hover": { backgroundColor: "#4B5677" },
-          }}
-          onClick={() => handleSectionClick('Friends')}
-        >
-          <PeopleAlt style={{ color: 'white' }} />
-          <Typography style={{ color: 'grey' }}>Friends</Typography>
-        </Stack>
-        <Typography style={{ color: 'grey' }}>Direct Messages</Typography>
+            {/* Message Section */}
+            <Box
+                sx={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                    backgroundColor: "#2D2F33",  
+                }}
+            >
+                {messages.map((message, index) => (
+                    <React.Fragment key={index}>
+                        {/* Date Separator */}
+                        {index === 0 || 
+                        new Date(messages[index - 1]?.timestamp).toDateString() !==
+                            new Date(message.timestamp).toDateString() ? (
+                            <Box
+                                sx={{
+                                    textAlign: "center",
+                                    color: "#B0B0B0",
+                                    fontSize: "12px",
+                                    marginBottom: "8px",
+                                }}
+                            >
+                                {new Date(message.timestamp).toDateString()}
+                            </Box>
+                        ) : null}
+                        {/* Message Bubble */}
+                        <Stack
+                            direction="row"
+                            justifyContent={
+                                message.sender_id === user.id ? "flex-end" : "flex-start"
+                            }
+                        >
+                            {message.sender_id !== user.id && (
+                                <Avatar
+                                    sx={{
+                                        width: 36,
+                                        height: 36,
+                                        marginRight: 1,
+                                        bgcolor: "#5E3F75",
+                                    }}
+                                >
+                                    {selectedChat.room_name[0]}
+                                </Avatar>
+                            )}
+                            <Box
+                                sx={{
+                                    padding: "12px",
+                                    borderRadius: "16px",
+                                    backgroundColor:
+                                        message.sender_id === user.id ? "#3A455A" : "#1E2A37",
+                                    color: "white",
+                                    maxWidth: "70%",
+                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                    wordWrap: "break-word",
+                                }}
+                            >
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        fontSize: "14px",
+                                        whiteSpace: "pre-wrap",
+                                        color: "rgba(255, 255, 255, 0.9)",
+                                    }}
+                                >
+                                    {message.content}
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        display: "block",
+                                        marginTop: "4px",
+                                        textAlign: "right",
+                                        fontSize: "10px",
+                                        color: "#B0B0B0",
+                                    }}
+                                >
+                                    {new Date(message.timestamp).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                    })}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    </React.Fragment>
+                ))}
+            </Box>
 
-        <Stack   style={{
-          maxHeight: '600px',  
-          overflowY: 'auto'    
-          }}
-          sx={{
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#32384D', 
-            borderRadius: '10px',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#888', 
-            borderRadius: '10px',
-          },
-          '&::-webkit-scrollbar-thumb:hover': {
-            backgroundColor: '#555', 
-          },
-          }}>
+            {/* Bottom Input Section */}
+            <Box
+                sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "8px 16px",
+                    height : 73     ,
+                    backgroundColor: "#333841",
+                    borderTop: "1px solid #444",
+                }}
+            >
 
-          {dms.map((dm, index) => (
-                        <Chat
-                            key={index}
-                            senderName={dm.users[0].username}
-                            message={`Chat with ${dm.users[0].username}`}
-                            avatarColor="#4A90E2"
-                            initial={dm.users[0].username[0]}
-                        />
-          ))}
-        </Stack>
-      </Stack>
-    </Box>
-  );
+                <IconButton sx={{ color: "#5E3F75" }}>
+                    <AttachFile />
+                </IconButton>
+                <TextField
+                fullWidth
+                variant="standard"
+                size="small"
+                multiline
+                placeholder="Type a message"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                InputProps={{
+                    disableUnderline: true,
+                }}
+                sx={{
+                    backgroundColor: "#4A3A60", 
+                    borderRadius: "20px",
+                    padding: "10px 14px", 
+                    color: "white",
+                    "& .MuiInputBase-input": {
+                        color: "white", 
+                    },
+                }}
+                />
+
+                <IconButton onClick={handleSendMessage} sx={{ marginLeft: "8px", color: "#5E3F75" }}>
+                    <Send />
+                </IconButton>
+            </Box>
+        </Box>
+    );
 }

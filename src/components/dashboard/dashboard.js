@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Box } from "@mui/material";
 import CircularProgress from "@mui/material/CircularProgress";
-import "../../styles/dashboard.css";
 import { Groups } from "./groups";
 import { Dms } from "./dms";
+import { Chats } from "./chats";
 
 const fetchUser = async (token) => {
     const response = await fetch("/user/current", {
@@ -26,14 +26,13 @@ const fetchUser = async (token) => {
 
 export function Dashboard() {
     const navigate = useNavigate();
-    const [selectedChat, setSelectedChat] = useState(null);
-
+    const [selectedChat, setSelectedChat] = useState(null); 
     const token = localStorage.getItem("token");
 
     const { data: user, isLoading, isError, error, refetch } = useQuery({
         queryKey: ["user", token],
         queryFn: () => fetchUser(token),
-        enabled: !!token,
+        enabled: !!token
     });
 
     useEffect(() => {
@@ -64,7 +63,7 @@ export function Dashboard() {
     }
 
     const handleSelectChat = (chat) => {
-        setSelectedChat(chat);
+        setSelectedChat(chat); 
     };
 
     return (
@@ -75,11 +74,14 @@ export function Dashboard() {
                 position: "fixed",
                 left: 0,
                 top: 0,
+                width: "100%",
             }}
         >
             <Groups token={token} onSelectChat={handleSelectChat} />
             <Dms user={user.user} token={token} onSelectChat={handleSelectChat} refetchUser={refetch} />
-            {/* Add Chats component here if needed */}
+            {selectedChat && (
+                <Chats selectedChat={selectedChat} user={user.user} token={token} />
+            )}
         </Box>
     );
 }

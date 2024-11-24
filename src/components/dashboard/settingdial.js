@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Avatar, Typography, TextField } from '@mui/material';
-import { useMutation } from '@tanstack/react-query'; 
+import { useMutation } from '@tanstack/react-query';
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -15,13 +15,12 @@ const formatDate = (dateString) => {
   });
 };
 
-const updateUserProfile = async ( username, email , token) => {
+const updateUserProfile = async (username, email, token) => {
   const response = await fetch(`/user/update`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
-
     },
     body: JSON.stringify({ username, email }),
   });
@@ -47,12 +46,12 @@ const updateUserProfile = async ( username, email , token) => {
   }
 };
 
-export function UserProfileDialog({ openProfile, handleCloseProfile, user , token , refetchUser }) {
+export function UserProfileDialog({ openProfile, handleCloseProfile, user, token, refetchUser }) {
   const [modifiedUsername, setModifiedUsername] = useState(user.username);
   const [modifiedEmail, setModifiedEmail] = useState(user.email);
 
   const mutation = useMutation({
-    mutationFn: (updatedUserData) => updateUserProfile(updatedUserData.username, updatedUserData.email , token),
+    mutationFn: (updatedUserData) => updateUserProfile(updatedUserData.username, updatedUserData.email, token),
     onSuccess: (data) => {
       console.log('Profile updated successfully:', data);
       refetchUser(); 
@@ -75,19 +74,21 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user , toke
       maxWidth="sm"
       PaperProps={{
         sx: {
-          backgroundColor: "#4B5677",  
-          color: "white",
-          borderRadius: "12px", 
-          height: "80vh",  
+          backgroundColor: "#2D2F32", 
+          color: "white", 
+          borderRadius: "12px",
+          height: "80vh", 
         }
       }}
     >
-      <DialogTitle>User Profile</DialogTitle>
+      <DialogTitle sx={{ borderBottom: "1px solid #333841", fontWeight: "bold" }}>
+        User Profile
+      </DialogTitle>
       <DialogContent>
-        <Box sx={{ paddingBottom: 2 }}>
+        <Box sx={{ paddingBottom: 2, textAlign: "center" }}>
           <Avatar
             sx={{
-              backgroundColor: user.profile_picture ? "transparent" : "#4A90E2",
+              backgroundColor: user.profile_picture ? "transparent" : "#5E3F75", 
               width: 80,
               height: 80,
               marginBottom: 2,
@@ -95,51 +96,76 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user , toke
             src={user?.profile_picture ? `https://localhost:16000/users/${user.profile_picture}` : ""}
             alt={`${user.first_name} ${user.last_name}`}
           />
-          <Typography variant="h6">{user.first_name} {user.last_name}</Typography>
+          <Typography variant="h6" sx={{ color: "#E5E7EB" }}>
+            {user.first_name} {user.last_name}
+          </Typography>
 
           {/* Username field */}
           <TextField
             fullWidth
             label="Username"
-            variant="outlined"
+            variant="filled"
             value={modifiedUsername}
             onChange={(e) => setModifiedUsername(e.target.value)}
-            sx={{ marginTop: 2 }}
+            sx={{
+              marginTop: 2,
+              backgroundColor: "#333841", 
+              input: { color: "#E5E7EB" },
+              "& .MuiInputLabel-root": { color: "#9CA3AF" }, 
+              "& .MuiFilledInput-root:hover": {
+                backgroundColor: "#4B5563", 
+              },
+            }}
           />
 
           {/* Email field */}
           <TextField
             fullWidth
             label="Email"
-            variant="outlined"
+            variant="filled"
             type="email"
             value={modifiedEmail}
             onChange={(e) => setModifiedEmail(e.target.value)}
-            sx={{ marginTop: 2 }}
+            sx={{
+              marginTop: 2,
+              backgroundColor: "#333841",
+              input: { color: "#E5E7EB" },
+              "& .MuiInputLabel-root": { color: "#9CA3AF" },
+              "& .MuiFilledInput-root:hover": {
+                backgroundColor: "#4B5563",
+              },
+            }}
           />
 
           {/* Role */}
-          <Typography variant="body2" sx={{ marginTop: 2 }}>
-            <strong>Role:</strong> {user.role} {/* Displaying the user role */}
+          <Typography variant="body2" sx={{ marginTop: 2, color: "#9CA3AF" }}>
+            <strong>Role:</strong> {user.role}
           </Typography>
 
           {/* Account Created At */}
-          <Typography variant="body2">
-            <strong>Account Created At:</strong> {formatDate(user.created_at)} {/* Formatted date */}
+          <Typography variant="body2" sx={{ color: "#9CA3AF" }}>
+            <strong>Account Created At:</strong> {formatDate(user.created_at)}
           </Typography>
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={handleCloseProfile} color="primary">
+      <DialogActions sx={{ borderTop: "1px solid #333841" }}>
+        <Button 
+          onClick={handleCloseProfile} 
+          sx={{ color: "#9CA3AF", "&:hover": { color: "#5E3F75" } }} 
+        >
           Close
         </Button>
         <Button 
           onClick={handleSave} 
-          color="primary" 
-          disabled={mutation.isLoading} 
+          sx={{ 
+            backgroundColor: "#5E3F75", 
+            color: "white", 
+            "&:hover": { backgroundColor: "#7F4E92" }
+          }} 
+          disabled={mutation.isLoading}
         >
-          {mutation.isLoading ? 'Saving...' : 'Save Changes'} {/* Show loading text */}
+          {mutation.isLoading ? 'Saving...' : 'Save Changes'}
         </Button>
       </DialogActions>
     </Dialog>

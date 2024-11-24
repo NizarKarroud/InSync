@@ -29,11 +29,9 @@ export function RegisterSection() {
             return await response.json();
         },
         onSuccess: (data) => {
-            // Handle success
             setStatus(data.status || "Registration successful");
         },
         onError: (error) => {
-            // Handle error
             setStatus(error.message || "An error occurred during registration.");
         },
     });

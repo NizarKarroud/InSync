@@ -94,7 +94,7 @@ def get_current_user():
     return jsonify({"user": user_data}), 200
 
 @app.route("/user/users", methods=["GET"])
-@limiter.limit("5 per minute") 
+@limiter.limit("15 per minute") 
 def get_users():
     query = models.User.query
 
@@ -143,7 +143,7 @@ def get_users():
 
 @app.route("/user/groups", methods=["GET"])
 @jwt_required()
-@limiter.limit("5 per minute") 
+@limiter.limit("15 per minute") 
 def get_user_groups():
     # Get current user's ID from JWT token
     current_user = get_jwt_identity()
@@ -348,7 +348,7 @@ def update_user():
         "isLogged": user.isLogged,
         "created_at": user.created_at.isoformat()
     }
-    access_token = create_access_token(identity={"username": user.username, "user_id": user_id} , expires_delta= datetime.timedelta(minutes=20))
+    access_token = create_access_token(identity={"username": user.username, "user_id": user_id} , expires_delta= datetime.timedelta(hours=24))
     response = jsonify({"status": "User updated successfully", "user": updated_user})
     response.headers['Authorization'] = f"Bearer {access_token}"
 

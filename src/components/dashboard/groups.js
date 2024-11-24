@@ -26,18 +26,18 @@ export function Groups({ token, onSelectChat }) {
     const { data: groups, isLoading, isError, error } = useQuery({
         queryKey: ['groups', token],
         queryFn: () => fetchGroups(token), 
-        enabled: !!token, 
+        enabled: !!token,
+        refetchInterval: 60000,
     });
 
     if (isLoading) {
         return (
-            <Box sx={{ display: 'flex' }}>
-              <CircularProgress />
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress />
             </Box>
-          );
+        );
     }
 
-    // Handle errors
     if (isError) {
         return <div>Error: {error.message}</div>;
     }
@@ -50,7 +50,7 @@ export function Groups({ token, onSelectChat }) {
     return (
         <Box
             sx={{
-                backgroundColor: "#282F41",
+                backgroundColor: "#2D2F32", 
                 height: "100vh",
                 width: 80,
                 boxShadow: "0px 0px 2px rgba(0, 0, 0, 0.25)",
@@ -58,16 +58,17 @@ export function Groups({ token, onSelectChat }) {
                 flexDirection: "column",
                 alignItems: "center",
                 paddingTop: 2,
+                border: "2px solid #5E3F75"
             }}
         >
             {/* Render groups */}
             {groups?.map((group) => (
                 <Avatar
                     key={group.room_id}
-                    onClick={() => handleGroupClick(group)} // When clicked, trigger selection and notify parent
+                    onClick={() => handleGroupClick(group)}
                     title={group.room_name}
                     sx={{
-                        bgcolor: group.room_id === selectedGroup ? "#764ae2" : "#4A90E2", // Highlight selected group
+                        bgcolor: group.room_id === selectedGroup ? "#5E3F75" : "#333841",
                         marginBottom: 2,
                         width: 40,
                         height: 40,
@@ -76,9 +77,12 @@ export function Groups({ token, onSelectChat }) {
                         cursor: "pointer",
                         border: group.room_id === selectedGroup ? "2px solid #FFFFFF" : "none",
                         transition: "all 0.3s ease",
+                        color: "#FFFFFF", 
+                        "&:hover": {
+                            bgcolor: "#5E3F75",
+                        },
                     }}
                 >
-                    {/* Display first letters of room name */}
                     {group.room_name
                         .split(" ")
                         .map((word) => word[0])
