@@ -1,12 +1,11 @@
 from flask import Flask, jsonify, render_template, request , url_for , send_from_directory 
-from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity 
+from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity  , decode_token
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo
 from flask_mail import Mail , Message
-from flask_socketio import SocketIO, emit , disconnect
+from flask_socketio import SocketIO, emit , disconnect , join_room, leave_room
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_cors import CORS
 
 import os
 from werkzeug.security import generate_password_hash , check_password_hash
@@ -20,9 +19,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-CORS(app)
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins=["http://192.168.100.9:3000"])
 
 app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
@@ -63,7 +61,15 @@ app.register_blueprint(swaggerui_blueprint)
 
 limiter = Limiter(get_remote_address, app=app)
 
-
+def decode_jwt(token):
+    try:
+        payload = decode_token(token)
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+    
 def send_email(app, msg):
     with app.app_context():
         mail.send(msg)
@@ -71,7 +77,7 @@ def send_email(app, msg):
 @socketio.on('connect')
 def handle_connect():
     token = request.args.get('token')
-    
+    print('Client connec')
     if not token:
         print("No token provided.")
         disconnect()  
@@ -84,14 +90,148 @@ def handle_disconnect():
 
 
 @socketio.on('joinRoom')
-def join_room_handler(data):
-    """
-    Join a room (either group or direct message).
-    """
-    room_id = data.get('room_id')
-    user_id = data.get('user_id')  
+def join_room_event(data):
+    token = request.args.get('token')
+    if not token:
+        emit('error', {'message': 'Token is missing!'})
+        return
 
-    print(f'User {user_id} joined room {room_id}')
+    user_payload = decode_jwt(token)
+    if not user_payload:
+        emit('error', {'message': 'Invalid or expired token!'})
+        return
+
+    user_id = user_payload["sub"]['user_id'] 
+    room_id = data.get('room_id')
+    print(data)
+    if not room_id:
+        emit('error', {'message': 'Room ID is required!'})
+        return
+
+    join_room(room_id)
+
+    print("user joined : " , user_id)
+    emit('user_joined', {'user_id': user_id, 'room_id': room_id}, room=room_id)
+
+    emit('joined_room', {'message': f'Joined room {room_id}'})
+
+
+@socketio.on('joinDirectRoom')
+def join_direct_room(data):
+    token = request.args.get('token')
+
+    if not token:
+        emit('error', {'message': 'Token is missing!'})
+        return
+
+    user_payload = decode_jwt(token)
+    print( "user payload is " ,  user_payload)
+
+    if not user_payload:
+        emit('error', {'message': 'Invalid or expired token!'})
+        return
+
+    print("Data received in joinDirectRoom:", data)
+
+    user_id = user_payload["sub"]['user_id']  
+    recipient = data.get('room')["users"][0]
+    recipient_id = recipient["user_id"]
+    room_id = data["room"]['room_id']
+    print(recipient_id)
+
+
+    join_room(room_id)
+
+    emit('directRoomJoined', {
+        'message': f'You have joined the direct room {room_id} with user {recipient_id}',
+        'room_id': room_id
+    })
+
+@socketio.on('sendDM')
+def handle_send_message(data):
+    token = request.args.get('token')
+    if not token:
+        emit('error', {'message': 'Token is missing!'})
+        return
+
+    user_payload = decode_jwt(token)
+    if not user_payload:
+        emit('error', {'message': 'Invalid or expired token!'})
+        return
+
+    user_id = user_payload["sub"]['user_id']
+    room_id = data.get('room_id')
+    message = data.get('message')
+
+    if not room_id or not message:
+        emit('error', {'message': 'Room ID and message are required!'})
+        return
+
+    # Broadcast the message to all users in the room
+    emit('receiveMessage', {
+        'room_id': room_id,
+        'user_id': user_id,
+        'message': message,
+        'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }, room=room_id)  
+
+
+@app.route('/room/create_direct_room', methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per minute")  # Limit to prevent spam
+def create_direct_room():
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    data = request.get_json()
+
+    recipient_user_id = data.get("recipient_id")
+
+    if not recipient_user_id:
+        return jsonify({"message": "Recipient user ID is required"}), 400
+
+    # Check if the current user is the same as the recipient (cannot create direct room with themselves)
+    if user_id == recipient_user_id:
+        return jsonify({"message": "Cannot create a room with yourself"}), 400
+
+    # Check if the direct room already exists between the two users
+    existing_room = models.Room.query \
+        .join(models.RoomUsers, models.Room.room_id == models.RoomUsers.room_id) \
+        .filter(models.RoomUsers.user_id == user_id) \
+        .join(models.RoomUsers, models.Room.room_id == models.RoomUsers.room_id) \
+        .filter(models.RoomUsers.user_id == recipient_user_id) \
+        .filter(models.Room.room_type == "direct") \
+        .first()
+
+    if existing_room:
+        return jsonify({
+            "message": "Direct room already exists",
+            "room_id": existing_room.room_id
+        }), 200
+
+    # Create a new direct room
+    new_room = models.Room(
+        room_type="direct"
+    )
+    models.db.session.add(new_room)
+    models.db.session.commit()
+
+    # Add both users to the room
+    room_user_1 = models.RoomUsers(user_id=user_id, room_id=new_room.room_id)
+    room_user_2 = models.RoomUsers(user_id=recipient_user_id, room_id=new_room.room_id)
+    models.db.session.add(room_user_1)
+    models.db.session.add(room_user_2)
+    models.db.session.commit()
+
+    return jsonify({
+        "message": "Direct room created successfully",
+        "room_id": new_room.room_id
+    }), 201
+
+
+
+
+
+
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
@@ -442,6 +582,6 @@ def reset_password():
         return jsonify({"message": "User not found"}), 404
         
 if __name__ == '__main__':
-    socketio.run(app , host='0.0.0.0', port=16000 , debug=True , ssl_context=(os.path.join(app.root_path, 'cert.pem'), os.path.join(app.root_path, 'key.pem')))
+    socketio.run(app , host='192.168.100.9', port=16000 , debug=True )
 
 

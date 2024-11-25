@@ -31,8 +31,9 @@ const fetchDms = async (token) => {
   return data.direct_rooms;
 };
 
-function DM({ dmUser, onSelectChat }) {
-  const { username, profile_picture, first_name, last_name } = dmUser;
+function DM({ dm, onSelectChat }) {
+  const { username, profile_picture, first_name, last_name } = dm["users"][0];
+  
   const initial = username.charAt(0).toUpperCase();
 
   return (
@@ -48,11 +49,11 @@ function DM({ dmUser, onSelectChat }) {
         transition: "background-color 0.3s",
         "&:hover": { backgroundColor: "#5E3F75" },
       }}
-      onClick={() => onSelectChat(dmUser)}
+      onClick={() => onSelectChat(dm)}
     >
       <Avatar
         sx={{ width: 30, height: 30, backgroundColor: "#5E3F75" }}
-        src={profile_picture ? `https://localhost:16000/users/${profile_picture}` : ""}
+        src={profile_picture ? `http://192.168.100.9:16000/users/${profile_picture}` : ""}
       >
         {!profile_picture && initial}
       </Avatar>
@@ -199,11 +200,10 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
         >
           {/* Mapping through Direct Messages */}
           {filteredDms.map((dm) => {
-            const user = dm.users[0]; 
             return (
               <DM
                 key={dm.room_id}
-                dmUser={user}
+                dm={dm}
                 onSelectChat={onSelectChat}
               />
             );
@@ -228,7 +228,7 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
             height: 40,
             marginRight: 2,
           }}
-          src={user?.profile_picture ? `https://localhost:16000/users/${user.profile_picture}` : ""}
+          src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
         >
           {!user.profile_picture && (user.username[0]).toUpperCase()}
         </Avatar>

@@ -7,13 +7,7 @@ import {
     Avatar,
     Stack,
 } from "@mui/material";
-import {
-    Call,
-    Videocam,
-    MoreVert,
-    AttachFile,
-    Send,
-} from "@mui/icons-material";
+import { Call, Videocam, MoreVert, AttachFile, Send } from "@mui/icons-material";
 
 const fetchMessages = async (chatId, token, isGroup) => {
     const url = isGroup ? `/chats/${chatId}/messages` : `/dms/${chatId}/messages`;
@@ -36,15 +30,13 @@ const fetchMessages = async (chatId, token, isGroup) => {
 export function Chats({ selectedChat, user, token, socket }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
-
-    const isGroupChat = !!selectedChat.room_id;
+    const isGroupChat = 'room_name' in selectedChat;
 
     useEffect(() => {
+        // Function to fetch messages for the selected chat
         const fetchChatMessages = async () => {
             try {
-                const chatId = isGroupChat
-                    ? selectedChat.room_id
-                    : selectedChat.user_id;
+                const chatId = selectedChat.room_id;
                 const messages = await fetchMessages(chatId, token, isGroupChat);
                 setMessages(messages);
             } catch (error) {
@@ -52,50 +44,56 @@ export function Chats({ selectedChat, user, token, socket }) {
             }
         };
 
-        if (selectedChat) {
-            fetchChatMessages();
-        }
-
+        // Join the room for the selected chat based on room_type
         if (socket) {
-            socket.emit("joinRoom", {
-                room_id: selectedChat.room_id,
-                user_id: user.user_id,
+            if (isGroupChat) {
+                socket.emit("joinRoom", {
+                    room_id: selectedChat.room_id,
+                    user_id: user.user_id,
+                });
+            } else {
+                socket.emit("joinDirectRoom", {
+                    room: selectedChat,
+                });
+            }
+
+            socket.on("directRoomJoined", (data) => {
+                console.log("Direct room joined:", data);
+            });
+
+            // Listen for incoming messages
+            socket.on("receiveMessage", (message) => {
+                console.log("Received message:", message); // Log the received message
+                setMessages((prevMessages) => [...prevMessages, message]);
             });
         }
 
         return () => {
             if (socket) {
-                const roomId = selectedChat.room_id;
-
-                
-                socket.emit("leaveRoom", roomId);
+                if (isGroupChat) {
+                    socket.emit("leaveRoom", selectedChat.room_id); // Leave the group room
+                } else {
+                    socket.emit("leaveDirectRoom", selectedChat.room_id); // Leave the direct message room
+                }
+                socket.off("receiveMessage");  // Remove event listener for receiveMessage
             }
         };
-    }, [selectedChat, token, socket]);
+    }, [selectedChat, token, socket, user.user_id, isGroupChat]);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
-
-        const url = isGroupChat
-            ? `/chats/${selectedChat.room_id}/messages`
-            : `/dms/${selectedChat.user_id}/messages`;
-
-        const response = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ message: newMessage }),
+        console.log("Sending message:", newMessage); // Log the message being sent
+        socket.emit("sendDM", {
+            room_id: selectedChat.room_id,
+            user_id: user.user_id,
+            message: newMessage,
         });
-
-        if (response.ok) {
-            const sentMessage = await response.json();
-            setMessages((prev) => [...prev, sentMessage]);
-            setNewMessage("");
-        } else {
-            console.error("Failed to send message");
-        }
+        alert(JSON.stringify({ content: newMessage, sender_id: user.user_id, timestamp: new Date() }))
+        setMessages((prevMessages) => [
+            ...prevMessages,
+            { content: newMessage, sender_id: user.user_id, timestamp: new Date() },
+        ]);
+        setNewMessage(""); // Clear the input after sending
     };
 
     return (
@@ -110,7 +108,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                 overflow: "hidden",
             }}
         >
-            {/* Top Header */}
+            {/* Top Header with room information */}
             <Box
                 sx={{
                     display: "flex",
@@ -122,10 +120,19 @@ export function Chats({ selectedChat, user, token, socket }) {
                 }}
             >
                 <Stack direction="row" alignItems="center" spacing={2}>
-                    <Avatar sx={{ bgcolor: "#5E3F75" }}>
+                    <Avatar
+                        sx={{ bgcolor: "#5E3F75" }}
+                        src={isGroupChat
+                            ? ""
+                            : selectedChat.users[0].profile_picture
+                            ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}` 
+                            : ""
+                        }
+                    >
                         {isGroupChat
-                            ? selectedChat.room_name[0]
-                            : selectedChat.username[0]}
+                            ? selectedChat.room_name[0] 
+                            : ""  
+                        }
                     </Avatar>
                     <Box>
                         <Typography
@@ -134,7 +141,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                         >
                             {isGroupChat
                                 ? selectedChat.room_name
-                                : selectedChat.username}
+                                : selectedChat.users[0].username}
                         </Typography>
                         {isGroupChat ? (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
@@ -142,7 +149,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                             </Typography>
                         ) : (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
-                                Chat with {selectedChat.first_name} {selectedChat.last_name}
+                                Chat with {selectedChat.users[0].first_name} {selectedChat.users[0].last_name}
                             </Typography>
                         )}
                     </Box>
@@ -192,22 +199,19 @@ export function Chats({ selectedChat, user, token, socket }) {
                         {/* Message Bubble */}
                         <Stack
                             direction="row"
-                            justifyContent={
-                                message.sender_id === user.id ? "flex-end" : "flex-start"
-                            }
+                            justifyContent={message.sender_id === user.user_id ? "flex-end" : "flex-start"}
                         >
-                            {message.sender_id !== user.id && (
+                            {message.sender_id !== user.user_id && (
                                 <Avatar
                                     sx={{
-                                        width: 36,
-                                        height: 36,
-                                        marginRight: 1,
-                                        bgcolor: "#5E3F75",
+                                        backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
+                                        width: 40,
+                                        height: 40,
+                                        marginRight: 2,
                                     }}
+                                    src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
                                 >
-                                    {isGroupChat
-                                        ? message.sender_name[0]
-                                        : selectedChat.username[0]}
+                                    {!user.profile_picture && (user.username[0]).toUpperCase()}
                                 </Avatar>
                             )}
                             <Box
@@ -215,7 +219,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                                     padding: "12px",
                                     borderRadius: "16px",
                                     backgroundColor:
-                                        message.sender_id === user.id
+                                        message.sender_id === user.user_id
                                             ? "#3A455A"
                                             : "#1E2A37",
                                     color: "white",
@@ -232,7 +236,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                                         color: "rgba(255, 255, 255, 0.9)",
                                     }}
                                 >
-                                    {message.content}
+                                    {message.content || "No content"}  {/* Fallback if content is missing */}
                                 </Typography>
                                 <Typography
                                     variant="caption"
@@ -284,14 +288,17 @@ export function Chats({ selectedChat, user, token, socket }) {
                     sx={{
                         backgroundColor: "#4A3A60",
                         borderRadius: "20px",
-                        padding: "10px 14px",
+                        padding: "10px 12px",
                         color: "white",
-                        "& .MuiInputBase-input": {
-                            color: "white",
-                        },
                     }}
                 />
-                <IconButton onClick={handleSendMessage} sx={{ marginLeft: "8px", color: "#5E3F75" }}>
+                <IconButton
+                    sx={{
+                        color: "#5E3F75",
+                        marginLeft: "8px",
+                    }}
+                    onClick={handleSendMessage}
+                >
                     <Send />
                 </IconButton>
             </Box>

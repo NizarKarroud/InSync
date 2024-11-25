@@ -93,7 +93,7 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user, token
               height: 80,
               marginBottom: 2,
             }}
-            src={user?.profile_picture ? `https://localhost:16000/users/${user.profile_picture}` : ""}
+            src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
             alt={`${user.first_name} ${user.last_name}`}
           />
           <Typography variant="h6" sx={{ color: "#E5E7EB" }}>

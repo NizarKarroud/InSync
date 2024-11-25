@@ -44,7 +44,7 @@ export function ViewUserDialog({ open, onClose, user, onSendMessage }) {
               height: 80,
               marginBottom: 2,
             }}
-            src={user.profile_picture ? `https://localhost:16000/users/${user.profile_picture}` : ""}
+            src={user.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
             alt={user.username}
           />
           <Typography variant="h6" sx={{ color: "#E5E7EB" }}>
@@ -197,7 +197,7 @@ export function UserListDialog({ open, onClose, token, onSendMessage, currentUse
                   <ListItem key={user.username} button onClick={() => handleUserClick(user)}>
                     <ListItemAvatar>
                       <Avatar
-                        src={`https://localhost:16000/users/${user.profile_picture}`}
+                        src={`http://192.168.100.9:16000/users/${user.profile_picture}`}
                         alt={user.username}
                       >
                         {!user.profile_picture && user.username[0].toUpperCase()}

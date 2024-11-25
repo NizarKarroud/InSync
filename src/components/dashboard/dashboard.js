@@ -6,7 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { Groups } from "./groups";
 import { Dms } from "./dms";
 import { Chats } from "./chats";
-import { io } from "socket.io-client";
+import { getSocket, disconnectSocket } from "./socket.js";
 
 const fetchUser = async (token) => {
     const response = await fetch("/user/current", {
@@ -21,8 +21,7 @@ const fetchUser = async (token) => {
         throw new Error(`Failed to fetch user, status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
+    return await response.json();
 };
 
 export function Dashboard() {
@@ -37,46 +36,47 @@ export function Dashboard() {
         enabled: !!token
     });
 
+    // Redirect to login if no token
     useEffect(() => {
         if (!token) {
             navigate("/login");
         }
     }, [token, navigate]);
 
+    // Initialize WebSocket connection
     useEffect(() => {
         if (token) {
-            const newSocket = io("https://localhost:16000", {
-                transports: ["websocket"],
-                query: {
-                    token: token, 
-                },
-            });
+            const newSocket = getSocket(token);
+            setSocket(newSocket);
 
+            // Attach event listeners
             newSocket.on("connect", () => {
                 console.log("Connected to WebSocket server");
             });
 
             newSocket.on("disconnect", () => {
-                localStorage.removeItem('token');
-                navigate("/login");
                 console.log("Disconnected from WebSocket server");
             });
 
-            newSocket.on('connect_error', (err) => {
-                console.error('Connection Error: ', err);
+            newSocket.on("directRoomJoined", (data) => {
+                console.log("Received directRoomJoined event: ", data);
+                alert(`You have joined the room ${data.room_id}: ${data.message}`);
             });
-            
-            newSocket.on("message", (message) => {
-                console.log("Message from server:", message);
-            });
-
-            setSocket(newSocket);
 
             return () => {
-                newSocket.disconnect();
+                newSocket.off("connect");
+                newSocket.off("disconnect");
+                newSocket.off("directRoomJoined");
             };
         }
-    }, [token , navigate]);
+    }, [token]);
+
+    // Cleanup WebSocket on component unmount
+    useEffect(() => {
+        return () => {
+            disconnectSocket();
+        };
+    }, []);
 
     if (!token) {
         return null;
@@ -101,9 +101,6 @@ export function Dashboard() {
 
     const handleSelectChat = (chat) => {
         setSelectedChat(chat); 
-        if (socket) {
-            socket.emit("joinRoom", { chatId: chat.room_id }); 
-        }
     };
 
     return (
