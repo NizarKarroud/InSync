@@ -1,9 +1,9 @@
-from flask import Flask, jsonify, render_template, request , url_for , send_from_directory , send_file
-from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity
+from flask import Flask, jsonify, render_template, request , url_for , send_from_directory 
+from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity 
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo
 from flask_mail import Mail , Message
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit , disconnect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
@@ -21,6 +21,8 @@ load_dotenv()
 app = Flask(__name__)
 
 CORS(app)
+
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 app.config["MONGO_URI"] = os.getenv('MONGO_URI')
 
@@ -65,6 +67,31 @@ limiter = Limiter(get_remote_address, app=app)
 def send_email(app, msg):
     with app.app_context():
         mail.send(msg)
+
+@socketio.on('connect')
+def handle_connect():
+    token = request.args.get('token')
+    
+    if not token:
+        print("No token provided.")
+        disconnect()  
+        return
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
+
+@socketio.on('joinRoom')
+def join_room_handler(data):
+    """
+    Join a room (either group or direct message).
+    """
+    room_id = data.get('room_id')
+    user_id = data.get('user_id')  
+
+    print(f'User {user_id} joined room {room_id}')
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
@@ -415,6 +442,6 @@ def reset_password():
         return jsonify({"message": "User not found"}), 404
         
 if __name__ == '__main__':
-    app.run('0.0.0.0', 16000 , debug=True , ssl_context=(os.path.join(app.root_path, 'cert.pem'), os.path.join(app.root_path, 'key.pem')))
+    socketio.run(app , host='0.0.0.0', port=16000 , debug=True , ssl_context=(os.path.join(app.root_path, 'cert.pem'), os.path.join(app.root_path, 'key.pem')))
 
 

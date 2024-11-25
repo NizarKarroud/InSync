@@ -52,7 +52,7 @@ export function Groups({ token, onSelectChat }) {
             sx={{
                 backgroundColor: "#2D2F32", 
                 height: "100vh",
-                width: 80,
+                width: { xs: "100%", sm: 80 },
                 boxShadow: "0px 0px 2px rgba(0, 0, 0, 0.25)",
                 display: "flex",
                 flexDirection: "column",

@@ -6,6 +6,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { Groups } from "./groups";
 import { Dms } from "./dms";
 import { Chats } from "./chats";
+import { io } from "socket.io-client";
 
 const fetchUser = async (token) => {
     const response = await fetch("/user/current", {
@@ -28,6 +29,7 @@ export function Dashboard() {
     const navigate = useNavigate();
     const [selectedChat, setSelectedChat] = useState(null); 
     const token = localStorage.getItem("token");
+    const [socket, setSocket] = useState(null); 
 
     const { data: user, isLoading, isError, error, refetch } = useQuery({
         queryKey: ["user", token],
@@ -40,6 +42,41 @@ export function Dashboard() {
             navigate("/login");
         }
     }, [token, navigate]);
+
+    useEffect(() => {
+        if (token) {
+            const newSocket = io("https://localhost:16000", {
+                transports: ["websocket"],
+                query: {
+                    token: token, 
+                },
+            });
+
+            newSocket.on("connect", () => {
+                console.log("Connected to WebSocket server");
+            });
+
+            newSocket.on("disconnect", () => {
+                localStorage.removeItem('token');
+                navigate("/login");
+                console.log("Disconnected from WebSocket server");
+            });
+
+            newSocket.on('connect_error', (err) => {
+                console.error('Connection Error: ', err);
+            });
+            
+            newSocket.on("message", (message) => {
+                console.log("Message from server:", message);
+            });
+
+            setSocket(newSocket);
+
+            return () => {
+                newSocket.disconnect();
+            };
+        }
+    }, [token , navigate]);
 
     if (!token) {
         return null;
@@ -64,12 +101,16 @@ export function Dashboard() {
 
     const handleSelectChat = (chat) => {
         setSelectedChat(chat); 
+        if (socket) {
+            socket.emit("joinRoom", { chatId: chat.room_id }); 
+        }
     };
 
     return (
         <Box
             sx={{
                 display: "flex",
+                flexDirection: { xs: "column", sm: "row" }, 
                 height: "100vh",
                 position: "fixed",
                 left: 0,
@@ -80,7 +121,7 @@ export function Dashboard() {
             <Groups token={token} onSelectChat={handleSelectChat} />
             <Dms user={user.user} token={token} onSelectChat={handleSelectChat} refetchUser={refetch} />
             {selectedChat && (
-                <Chats selectedChat={selectedChat} user={user.user} token={token} />
+                <Chats selectedChat={selectedChat} user={user.user} token={token} socket={socket} />
             )}
         </Box>
     );

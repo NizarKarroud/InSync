@@ -6,19 +6,18 @@ import {
     Typography,
     Avatar,
     Stack,
-    Divider,
 } from "@mui/material";
 import {
     Call,
     Videocam,
     MoreVert,
-    InsertEmoticon,
     AttachFile,
     Send,
 } from "@mui/icons-material";
 
-const fetchMessages = async (chatId, token) => {
-    const response = await fetch(`/chats/${chatId}/messages`, {
+const fetchMessages = async (chatId, token, isGroup) => {
+    const url = isGroup ? `/chats/${chatId}/messages` : `/dms/${chatId}/messages`;
+    const response = await fetch(url, {
         method: "GET",
         headers: {
             "Content-Type": "application/json",
@@ -34,27 +33,54 @@ const fetchMessages = async (chatId, token) => {
     return data.messages;
 };
 
-export function Chats({ selectedChat, user, token }) {
+export function Chats({ selectedChat, user, token, socket }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
+
+    const isGroupChat = !!selectedChat.room_id;
 
     useEffect(() => {
         const fetchChatMessages = async () => {
             try {
-                const messages = await fetchMessages(selectedChat.room_id, token);
+                const chatId = isGroupChat
+                    ? selectedChat.room_id
+                    : selectedChat.user_id;
+                const messages = await fetchMessages(chatId, token, isGroupChat);
                 setMessages(messages);
             } catch (error) {
                 console.error("Error fetching messages:", error);
             }
         };
 
-        fetchChatMessages();
-    }, [selectedChat, token]);
+        if (selectedChat) {
+            fetchChatMessages();
+        }
+
+        if (socket) {
+            socket.emit("joinRoom", {
+                room_id: selectedChat.room_id,
+                user_id: user.user_id,
+            });
+        }
+
+        return () => {
+            if (socket) {
+                const roomId = selectedChat.room_id;
+
+                
+                socket.emit("leaveRoom", roomId);
+            }
+        };
+    }, [selectedChat, token, socket]);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
 
-        const response = await fetch(`/chats/${selectedChat.room_id}/messages`, {
+        const url = isGroupChat
+            ? `/chats/${selectedChat.room_id}/messages`
+            : `/dms/${selectedChat.user_id}/messages`;
+
+        const response = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -78,13 +104,13 @@ export function Chats({ selectedChat, user, token }) {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                backgroundColor: "#2D2F33", // Primary background
+                backgroundColor: "#2D2F33",
                 color: "white",
                 height: "100%",
                 overflow: "hidden",
             }}
         >
-            {/* Compact Top Header */}
+            {/* Top Header */}
             <Box
                 sx={{
                     display: "flex",
@@ -92,21 +118,33 @@ export function Chats({ selectedChat, user, token }) {
                     justifyContent: "space-between",
                     padding: "8px 16px",
                     backgroundColor: "#333841",
-                    borderBottom: "1px solid #444", 
+                    borderBottom: "1px solid #444",
                 }}
             >
                 <Stack direction="row" alignItems="center" spacing={2}>
-                    <Avatar sx={{ bgcolor: "#5E3F75" }}>{selectedChat.room_name[0]}</Avatar>
+                    <Avatar sx={{ bgcolor: "#5E3F75" }}>
+                        {isGroupChat
+                            ? selectedChat.room_name[0]
+                            : selectedChat.username[0]}
+                    </Avatar>
                     <Box>
                         <Typography
                             variant="subtitle1"
                             sx={{ fontWeight: "bold", color: "white" }}
                         >
-                            {selectedChat.room_name}
+                            {isGroupChat
+                                ? selectedChat.room_name
+                                : selectedChat.username}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
-                            Last active 10 mins ago
-                        </Typography>
+                        {isGroupChat ? (
+                            <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
+                                {selectedChat.users.length} members
+                            </Typography>
+                        ) : (
+                            <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
+                                Chat with {selectedChat.first_name} {selectedChat.last_name}
+                            </Typography>
+                        )}
                     </Box>
                 </Stack>
                 <Stack direction="row" spacing={1}>
@@ -131,13 +169,13 @@ export function Chats({ selectedChat, user, token }) {
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
-                    backgroundColor: "#2D2F33",  
+                    backgroundColor: "#2D2F33",
                 }}
             >
                 {messages.map((message, index) => (
                     <React.Fragment key={index}>
                         {/* Date Separator */}
-                        {index === 0 || 
+                        {index === 0 ||
                         new Date(messages[index - 1]?.timestamp).toDateString() !==
                             new Date(message.timestamp).toDateString() ? (
                             <Box
@@ -167,7 +205,9 @@ export function Chats({ selectedChat, user, token }) {
                                         bgcolor: "#5E3F75",
                                     }}
                                 >
-                                    {selectedChat.room_name[0]}
+                                    {isGroupChat
+                                        ? message.sender_name[0]
+                                        : selectedChat.username[0]}
                                 </Avatar>
                             )}
                             <Box
@@ -175,7 +215,9 @@ export function Chats({ selectedChat, user, token }) {
                                     padding: "12px",
                                     borderRadius: "16px",
                                     backgroundColor:
-                                        message.sender_id === user.id ? "#3A455A" : "#1E2A37",
+                                        message.sender_id === user.id
+                                            ? "#3A455A"
+                                            : "#1E2A37",
                                     color: "white",
                                     maxWidth: "70%",
                                     boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
@@ -219,37 +261,36 @@ export function Chats({ selectedChat, user, token }) {
                     display: "flex",
                     alignItems: "center",
                     padding: "8px 16px",
-                    height : 73     ,
+                    height: 73,
                     backgroundColor: "#333841",
                     borderTop: "1px solid #444",
                 }}
             >
-
                 <IconButton sx={{ color: "#5E3F75" }}>
                     <AttachFile />
                 </IconButton>
                 <TextField
-                fullWidth
-                variant="standard"
-                size="small"
-                multiline
-                placeholder="Type a message"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                InputProps={{
-                    disableUnderline: true,
-                }}
-                sx={{
-                    backgroundColor: "#4A3A60", 
-                    borderRadius: "20px",
-                    padding: "10px 14px", 
-                    color: "white",
-                    "& .MuiInputBase-input": {
-                        color: "white", 
-                    },
-                }}
+                    fullWidth
+                    variant="standard"
+                    size="small"
+                    multiline
+                    placeholder="Type a message"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    InputProps={{
+                        disableUnderline: true,
+                    }}
+                    maxRows={1}
+                    sx={{
+                        backgroundColor: "#4A3A60",
+                        borderRadius: "20px",
+                        padding: "10px 14px",
+                        color: "white",
+                        "& .MuiInputBase-input": {
+                            color: "white",
+                        },
+                    }}
                 />
-
                 <IconButton onClick={handleSendMessage} sx={{ marginLeft: "8px", color: "#5E3F75" }}>
                     <Send />
                 </IconButton>

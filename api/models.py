@@ -95,6 +95,3 @@ class RoomUsers(db.Model):
     room_id = db.Column(db.Integer, db.ForeignKey('Rooms.room_id'), primary_key=True)
 
 
-# """
-#     gonna store the file locally in static/files/room_id/file.extension
-# """

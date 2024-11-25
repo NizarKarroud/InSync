@@ -81,7 +81,7 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user, token
         }
       }}
     >
-      <DialogTitle sx={{ borderBottom: "1px solid #333841", fontWeight: "bold" }}>
+      <DialogTitle sx={{ borderBottom: "1px solid #333841", fontWeight: "bold" , marginBottom:2}}>
         User Profile
       </DialogTitle>
       <DialogContent>

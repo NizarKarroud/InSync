@@ -12,6 +12,7 @@ import {
 import { PeopleAlt, ListAlt, SettingsOutlined } from "@mui/icons-material";
 import { useQuery } from "@tanstack/react-query";
 import { UserProfileDialog } from "./settingdial";
+import { UserListDialog } from "./userdial";
 
 const fetchDms = async (token) => {
   const response = await fetch("/user/dms", {
@@ -30,7 +31,10 @@ const fetchDms = async (token) => {
   return data.direct_rooms;
 };
 
-function DM({ senderName, message, avatarColor, initial }) {
+function DM({ dmUser, onSelectChat }) {
+  const { username, profile_picture, first_name, last_name } = dmUser;
+  const initial = username.charAt(0).toUpperCase();
+
   return (
     <Stack
       direction="row"
@@ -42,18 +46,22 @@ function DM({ senderName, message, avatarColor, initial }) {
         borderRadius: "10px",
         padding: 1,
         transition: "background-color 0.3s",
-        "&:hover": { backgroundColor: "#5E3F75" }, 
+        "&:hover": { backgroundColor: "#5E3F75" },
       }}
+      onClick={() => onSelectChat(dmUser)}
     >
-      <Avatar sx={{ width: 30, height: 30, backgroundColor: avatarColor }}>
-        {initial}
+      <Avatar
+        sx={{ width: 30, height: 30, backgroundColor: "#5E3F75" }}
+        src={profile_picture ? `https://localhost:16000/users/${profile_picture}` : ""}
+      >
+        {!profile_picture && initial}
       </Avatar>
       <Box>
         <Typography style={{ color: "white", fontWeight: "bold" }}>
-          {senderName}
+          {username} 
         </Typography>
         <Typography style={{ color: "grey", fontSize: "0.875rem" }}>
-          {message}
+          Chat with {`${first_name} ${last_name}`}
         </Typography>
       </Box>
     </Stack>
@@ -68,9 +76,32 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
   });
 
   const [openProfile, setOpenProfile] = useState(false);
+  const [openUsersDialog, setOpenUsersDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");  
 
   const handleSettingsClick = () => setOpenProfile(true);
   const handleCloseProfile = () => setOpenProfile(false);
+
+  const handleOpenUsersDialog = () => setOpenUsersDialog(true);
+  const handleCloseUsersDialog = () => setOpenUsersDialog(false);
+
+  const handleSendMessage = (selectedUser) => {
+    handleCloseUsersDialog();
+    onSelectChat(selectedUser);
+  };
+
+  const filterDms = (dms, query) => {
+    if (!query) return dms; 
+
+    const queryLower = query.toLowerCase();
+    return dms.filter((dm) => {
+      const user = dm.users[0];
+      const userString = `${user.username} ${user.first_name} ${user.last_name}`.toLowerCase();
+      return userString.includes(queryLower); 
+    });
+  };
+
+  const filteredDms = dms ? filterDms(dms, searchQuery) : [];
 
   if (isLoading) {
     return (
@@ -88,7 +119,7 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
     <Box
       sx={{
         height: "100vh",
-        width: 280,
+        width: { xs: "100%", sm: 280 },
         backgroundColor: "#1E2326",
         boxShadow: "0px 0px 2px rgba(0, 0, 0, 0.25)",
         display: "flex",
@@ -98,6 +129,7 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
     >
       {/* Main Content */}
       <Stack sx={{ padding: 2, flex: 1, overflow: "hidden" }}>
+        {/* Search Bar */}
         <TextField
           placeholder="Search"
           variant="outlined"
@@ -116,43 +148,31 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
               paddingY: 0.5,
             },
           }}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)} 
         />
         <Divider sx={{ borderBottomWidth: 2, borderColor: "#5E3F75" }} />
 
+        {/* Users Section */}
         <Stack
           direction={"row"}
           alignContent={"center"}
           spacing={1.5}
           sx={{
             marginTop: 2,
-            marginBottom: 1,
+            marginBottom: 2,
             cursor: "pointer",
             borderRadius: "10px",
             transition: "background-color 0.3s",
             "&:hover": { backgroundColor: "#5E3F75" },
           }}
+          onClick={handleOpenUsersDialog}
         >
           <ListAlt style={{ color: "white" }} />
           <Typography style={{ color: "grey" }}>Users</Typography>
         </Stack>
 
-        <Stack
-          direction={"row"}
-          alignContent={"center"}
-          spacing={1.5}
-          sx={{
-            marginTop: 1,
-            marginBottom: 4,
-            cursor: "pointer",
-            borderRadius: "10px",
-            transition: "background-color 0.3s",
-            "&:hover": { backgroundColor: "#5E3F75" },
-          }}
-        >
-          <PeopleAlt style={{ color: "white" }} />
-          <Typography style={{ color: "grey" }}>Friends</Typography>
-        </Stack>
-
+        {/* Direct Messages */}
         <Typography style={{ color: "grey" }}>Direct Messages</Typography>
 
         <Stack
@@ -165,7 +185,7 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
               width: "8px",
             },
             "&::-webkit-scrollbar-track": {
-              backgroundColor: "#1E2326",  
+              backgroundColor: "#1E2326",
               borderRadius: "10px",
             },
             "&::-webkit-scrollbar-thumb": {
@@ -177,15 +197,17 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
             },
           }}
         >
-          {dms?.map((dm, index) => (
-            <DM
-              key={index}
-              senderName={dm.users[0].username}
-              message={`Chat with ${dm.users[0].username}`}
-              avatarColor="#5E3F75"
-              initial={dm.users[0].username[0]}
-            />
-          ))}
+          {/* Mapping through Direct Messages */}
+          {filteredDms.map((dm) => {
+            const user = dm.users[0]; 
+            return (
+              <DM
+                key={dm.room_id}
+                dmUser={user}
+                onSelectChat={onSelectChat}
+              />
+            );
+          })}
         </Stack>
       </Stack>
 
@@ -197,7 +219,6 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
           display: "flex",
           alignItems: "center",
           borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-          
         }}
       >
         <Avatar
@@ -228,6 +249,8 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
         user={user}
         token={token}
       />
+      {/* Users List Dialog */}
+      <UserListDialog open={openUsersDialog} onClose={handleCloseUsersDialog} token={token} onSendMessage={handleSendMessage} currentUser={user} />
     </Box>
   );
 }
