@@ -55,7 +55,6 @@ function DM({ dm, onSelectChat }) {
         sx={{ width: 30, height: 30, backgroundColor: "#5E3F75" }}
         src={profile_picture ? `http://192.168.100.9:16000/users/${profile_picture}` : ""}
       >
-        {!profile_picture && initial}
       </Avatar>
       <Box>
         <Typography style={{ color: "white", fontWeight: "bold" }}>
@@ -230,7 +229,6 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
           }}
           src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
         >
-          {!user.profile_picture && (user.username[0]).toUpperCase()}
         </Avatar>
 
         <Typography sx={{ color: "white", fontWeight: "bold", marginRight: 1 }}>

@@ -229,10 +229,6 @@ def create_direct_room():
 
 
 
-
-
-
-
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
 @limiter.limit("20 per minute")  
@@ -475,7 +471,7 @@ def register():
 
 @app.route('/user/update', methods=['PUT'])
 @jwt_required()
-@limiter.limit("2 per minute")  
+@limiter.limit("3 per minute")  
 def update_user():
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
@@ -520,6 +516,13 @@ def update_user():
     response.headers['Authorization'] = f"Bearer {access_token}"
 
     return response , 200
+
+@app.route('/user/notifications')
+@jwt_required()
+@limiter.limit("10 per minute")
+def get_notifs():
+    pass
+
 
 
 @app.route("/users/<path:name>")

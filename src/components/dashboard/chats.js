@@ -63,7 +63,10 @@ export function Chats({ selectedChat, user, token, socket }) {
 
             // Listen for incoming messages
             socket.on("receiveMessage", (message) => {
-                console.log("Received message:", message); // Log the received message
+                console.log("Received message:", message); 
+                if (message.user_id === user.user_id) {
+                    return;
+                }
                 setMessages((prevMessages) => [...prevMessages, message]);
             });
         }
@@ -82,18 +85,20 @@ export function Chats({ selectedChat, user, token, socket }) {
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
-        console.log("Sending message:", newMessage); // Log the message being sent
-        socket.emit("sendDM", {
+    
+        const message = {
             room_id: selectedChat.room_id,
             user_id: user.user_id,
             message: newMessage,
-        });
-        alert(JSON.stringify({ content: newMessage, sender_id: user.user_id, timestamp: new Date() }))
-        setMessages((prevMessages) => [
-            ...prevMessages,
-            { content: newMessage, sender_id: user.user_id, timestamp: new Date() },
-        ]);
-        setNewMessage(""); // Clear the input after sending
+            timestamp: new Date(),
+        };
+    
+        // Emit the message to the server
+        socket.emit("sendDM", message);
+    
+        setMessages((prevMessages) => [...prevMessages, message]);
+    
+        setNewMessage("");
     };
 
     return (
@@ -199,9 +204,9 @@ export function Chats({ selectedChat, user, token, socket }) {
                         {/* Message Bubble */}
                         <Stack
                             direction="row"
-                            justifyContent={message.sender_id === user.user_id ? "flex-end" : "flex-start"}
+                            justifyContent={message.user_id === user.user_id ? "flex-end" : "flex-start"}
                         >
-                            {message.sender_id !== user.user_id && (
+                            {message.user_id !== user.user_id && (
                                 <Avatar
                                     sx={{
                                         backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
@@ -209,9 +214,9 @@ export function Chats({ selectedChat, user, token, socket }) {
                                         height: 40,
                                         marginRight: 2,
                                     }}
-                                    src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
+                                    src={selectedChat.users[0].profile_picture ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}` : ""}
                                 >
-                                    {!user.profile_picture && (user.username[0]).toUpperCase()}
+
                                 </Avatar>
                             )}
                             <Box
@@ -219,7 +224,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                                     padding: "12px",
                                     borderRadius: "16px",
                                     backgroundColor:
-                                        message.sender_id === user.user_id
+                                        message.user_id === user.user_id
                                             ? "#3A455A"
                                             : "#1E2A37",
                                     color: "white",
@@ -236,7 +241,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                                         color: "rgba(255, 255, 255, 0.9)",
                                     }}
                                 >
-                                    {message.content || "No content"}  {/* Fallback if content is missing */}
+                                    {message.message || ""}  {/* Fallback if content is missing */}
                                 </Typography>
                                 <Typography
                                     variant="caption"
