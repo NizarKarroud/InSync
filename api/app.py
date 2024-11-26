@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, request , url_for , send_from_directory 
 from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity  , decode_token
 from flask_swagger_ui import get_swaggerui_blueprint
-from flask_pymongo import PyMongo
+from flask_pymongo import PyMongo 
 from flask_mail import Mail , Message
 from flask_socketio import SocketIO, emit , disconnect , join_room, leave_room
 from flask_limiter import Limiter
@@ -167,6 +167,8 @@ def handle_send_message(data):
         emit('error', {'message': 'Room ID and message are required!'})
         return
 
+    user_message = models.UserMessage(user_id , room_id , message , "text" ).json
+    mongo.db.UserMessages.insert_one(user_message)
     # Broadcast the message to all users in the room
     emit('receiveMessage', {
         'room_id': room_id,
@@ -178,7 +180,7 @@ def handle_send_message(data):
 
 @app.route('/room/create_direct_room', methods=['POST'])
 @jwt_required()
-@limiter.limit("10 per minute")  # Limit to prevent spam
+@limiter.limit("10 per minute")  
 def create_direct_room():
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
@@ -189,11 +191,9 @@ def create_direct_room():
     if not recipient_user_id:
         return jsonify({"message": "Recipient user ID is required"}), 400
 
-    # Check if the current user is the same as the recipient (cannot create direct room with themselves)
     if user_id == recipient_user_id:
         return jsonify({"message": "Cannot create a room with yourself"}), 400
 
-    # Check if the direct room already exists between the two users
     existing_room = models.Room.query \
         .join(models.RoomUsers, models.Room.room_id == models.RoomUsers.room_id) \
         .filter(models.RoomUsers.user_id == user_id) \
@@ -208,14 +208,12 @@ def create_direct_room():
             "room_id": existing_room.room_id
         }), 200
 
-    # Create a new direct room
     new_room = models.Room(
         room_type="direct"
     )
     models.db.session.add(new_room)
     models.db.session.commit()
 
-    # Add both users to the room
     room_user_1 = models.RoomUsers(user_id=user_id, room_id=new_room.room_id)
     room_user_2 = models.RoomUsers(user_id=recipient_user_id, room_id=new_room.room_id)
     models.db.session.add(room_user_1)
@@ -228,10 +226,41 @@ def create_direct_room():
     }), 201
 
 
+@app.route('/room/messages/<int:room_id>', methods=['GET'])
+@jwt_required()
+def get_room_messages(room_id):
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+
+    offset = int(request.args.get('offset', 0))
+
+    # Calculate the number of messages to skip (20 messages per offset)
+    skip = offset * 20
+
+    # Retrieve the 20 latest messages from the UserMessages collection for the given room
+    messages = mongo.db.UserMessages.find(
+        {'room_id': room_id}
+    ).sort('timestamp', -1).skip(skip).limit(20)
+
+    message_list = [
+        {
+            'user_id': message['sender_id'],
+            'room_id': message['room_id'],
+            'message': message['message'],
+            'message_type': message['message_type'],
+            'timestamp': message['timestamp']
+        }
+        for message in messages
+    ]
+    
+    return jsonify({
+        'messages': message_list
+    }), 200
+
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
-@limiter.limit("20 per minute")  
+@limiter.limit("100 per minute")  
 def get_current_user():
     current_user = get_jwt_identity()
     
@@ -306,7 +335,7 @@ def get_users():
 
 @app.route("/user/groups", methods=["GET"])
 @jwt_required()
-@limiter.limit("15 per minute") 
+@limiter.limit("100 per minute") 
 def get_user_groups():
     # Get current user's ID from JWT token
     current_user = get_jwt_identity()
@@ -352,7 +381,7 @@ def get_user_groups():
 
 @app.route("/user/dms", methods=["GET"])
 @jwt_required()
-@limiter.limit("10 per minute") 
+@limiter.limit("100 per minute") 
 def get_user_dms():
     # Get current user's ID from JWT token
     current_user = get_jwt_identity()

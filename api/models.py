@@ -46,25 +46,27 @@ class LoginAttempt:
         }
 
 class UserMessage:
-    def __init__(self,sender_id, room_id, message_text , message_type , attachments):
+    def __init__(self,sender_id, room_id, message_text , message_type , attachments=None):
         self.room_id = room_id
         self.sender_id = sender_id
         self.timestamp =  datetime.now(timezone.utc)
         self.message_text = message_text  
-        self.message_type = message_type  #"text",  // e.g., text, image, file
-        self.attachments = attachments  # "static/files/room_id/file.extension" 
+        self.message_type = message_type  #"text",  // e.g., text, file
+        self.attachments = attachments   # "static/files/rooms/room_id/file.extension" 
     
     @property
     def json(self):
-        return {
-            "sender_id" : self.sender_id,
+        message_dict = {
+            "sender_id": self.sender_id,
             "room_id": self.room_id,
             "timestamp": self.timestamp,
-            "message_text": self.message_text,
+            "message": self.message_text,
             "message_type": self.message_type,
-            "attachments": self.attachments
         }
-
+        if self.attachments:  
+            message_dict["attachments"] = self.attachments
+        return message_dict
+    
 class User(db.Model):
     __tablename__ = "Users"
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)

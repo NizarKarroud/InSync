@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect , useRef } from "react";
 import {
     Box,
     IconButton,
@@ -9,8 +9,8 @@ import {
 } from "@mui/material";
 import { Call, Videocam, MoreVert, AttachFile, Send } from "@mui/icons-material";
 
-const fetchMessages = async (chatId, token, isGroup) => {
-    const url = isGroup ? `/chats/${chatId}/messages` : `/dms/${chatId}/messages`;
+const fetchMessages = async (room_id, token, offset = 0) => {
+    const url = `/room/messages/${room_id}?offset=${offset}`;
     const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -31,14 +31,16 @@ export function Chats({ selectedChat, user, token, socket }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const isGroupChat = 'room_name' in selectedChat;
-
+    const messagesEndRef = useRef(null); // Reference to scroll to the bottom
+    const chatContainerRef = useRef(null); // Reference to detect scroll position
     useEffect(() => {
         // Function to fetch messages for the selected chat
         const fetchChatMessages = async () => {
             try {
                 const chatId = selectedChat.room_id;
-                const messages = await fetchMessages(chatId, token, isGroupChat);
-                setMessages(messages);
+                const messages = await fetchMessages(chatId, token);
+                console.log("the fetched messages : " , messages)
+                setMessages(messages.reverse());
             } catch (error) {
                 console.error("Error fetching messages:", error);
             }
@@ -59,6 +61,7 @@ export function Chats({ selectedChat, user, token, socket }) {
 
             socket.on("directRoomJoined", (data) => {
                 console.log("Direct room joined:", data);
+                fetchChatMessages();
             });
 
             // Listen for incoming messages
@@ -74,11 +77,11 @@ export function Chats({ selectedChat, user, token, socket }) {
         return () => {
             if (socket) {
                 if (isGroupChat) {
-                    socket.emit("leaveRoom", selectedChat.room_id); // Leave the group room
+                    socket.emit("leaveRoom", selectedChat.room_id); 
                 } else {
-                    socket.emit("leaveDirectRoom", selectedChat.room_id); // Leave the direct message room
+                    socket.emit("leaveDirectRoom", selectedChat.room_id); 
                 }
-                socket.off("receiveMessage");  // Remove event listener for receiveMessage
+                socket.off("receiveMessage"); 
             }
         };
     }, [selectedChat, token, socket, user.user_id, isGroupChat]);
