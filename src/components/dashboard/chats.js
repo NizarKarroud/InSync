@@ -24,6 +24,7 @@ const fetchMessages = async (room_id, token, offset = 0) => {
     }
 
     const data = await response.json();
+    console.log("fetched :" , data.messages)
     return data.messages;
 };
 
@@ -31,13 +32,12 @@ export function Chats({ selectedChat, user, token, socket }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const isGroupChat = 'room_name' in selectedChat;
-    const messagesEndRef = useRef(null); // Reference to scroll to the bottom
-    const chatContainerRef = useRef(null); // Reference to detect scroll position
+    console.log("selected chat :" , selectedChat)
     useEffect(() => {
-        // Function to fetch messages for the selected chat
         const fetchChatMessages = async () => {
             try {
                 const chatId = selectedChat.room_id;
+                console.log("chat id : " , chatId)
                 const messages = await fetchMessages(chatId, token);
                 console.log("the fetched messages : " , messages)
                 setMessages(messages.reverse());
@@ -53,6 +53,8 @@ export function Chats({ selectedChat, user, token, socket }) {
                     room_id: selectedChat.room_id,
                     user_id: user.user_id,
                 });
+                fetchChatMessages();
+
             } else {
                 socket.emit("joinDirectRoom", {
                     room: selectedChat,
@@ -76,12 +78,10 @@ export function Chats({ selectedChat, user, token, socket }) {
 
         return () => {
             if (socket) {
-                if (isGroupChat) {
-                    socket.emit("leaveRoom", selectedChat.room_id); 
-                } else {
-                    socket.emit("leaveDirectRoom", selectedChat.room_id); 
-                }
+                socket.emit("leaveRoom", selectedChat.room_id); 
                 socket.off("receiveMessage"); 
+                setMessages([]);
+
             }
         };
     }, [selectedChat, token, socket, user.user_id, isGroupChat]);

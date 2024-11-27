@@ -42,6 +42,7 @@ app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 app.config["FRONTEND_URL"] = os.getenv("FRONTEND_URL")
 
+
 jwt = JWTManager(app)
 mail = Mail(app)
 mongo = PyMongo(app)
@@ -77,9 +78,11 @@ def send_email(app, msg):
 @socketio.on('connect')
 def handle_connect():
     token = request.args.get('token')
-    print('Client connec')
     if not token:
-        print("No token provided.")
+        disconnect()  
+        return
+    user_payload = decode_jwt(token)
+    if not user_payload:
         disconnect()  
         return
 
@@ -103,14 +106,12 @@ def join_room_event(data):
 
     user_id = user_payload["sub"]['user_id'] 
     room_id = data.get('room_id')
-    print(data)
     if not room_id:
         emit('error', {'message': 'Room ID is required!'})
         return
 
     join_room(room_id)
 
-    print("user joined : " , user_id)
     emit('user_joined', {'user_id': user_id, 'room_id': room_id}, room=room_id)
 
     emit('joined_room', {'message': f'Joined room {room_id}'})
@@ -125,19 +126,16 @@ def join_direct_room(data):
         return
 
     user_payload = decode_jwt(token)
-    print( "user payload is " ,  user_payload)
 
     if not user_payload:
         emit('error', {'message': 'Invalid or expired token!'})
         return
 
-    print("Data received in joinDirectRoom:", data)
 
     user_id = user_payload["sub"]['user_id']  
     recipient = data.get('room')["users"][0]
     recipient_id = recipient["user_id"]
     room_id = data["room"]['room_id']
-    print(recipient_id)
 
 
     join_room(room_id)
@@ -146,6 +144,31 @@ def join_direct_room(data):
         'message': f'You have joined the direct room {room_id} with user {recipient_id}',
         'room_id': room_id
     })
+
+@socketio.on('leaveRoom')
+def leave_room_event(data):
+    token = request.args.get('token')
+    if not token:
+        emit('error', {'message': 'Token is missing!'})
+        return
+
+    user_payload = decode_jwt(token)
+    if not user_payload:
+        emit('error', {'message': 'Invalid or expired token!'})
+        return
+
+    user_id = user_payload["sub"]['user_id']
+    room_id = data
+
+    if not room_id:
+        emit('error', {'message': 'Room ID is required!'})
+        return
+
+    leave_room(room_id)
+
+    emit('user_left', {'user_id': user_id, 'room_id': room_id}, room=room_id)
+
+    emit('left_room', {'message': f'You have left the room {room_id}'})
 
 @socketio.on('sendDM')
 def handle_send_message(data):
