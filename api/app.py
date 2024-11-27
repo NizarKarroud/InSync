@@ -6,6 +6,7 @@ from flask_mail import Mail , Message
 from flask_socketio import SocketIO, emit , disconnect , join_room, leave_room
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.utils import secure_filename
 
 import os
 from werkzeug.security import generate_password_hash , check_password_hash
@@ -29,6 +30,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("POSTGRES_URI")
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files' )
 
 app.config['USERS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "users" )
+app.config['ROOMS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "rooms" )
+
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}  # Allowed image extensions
 
 models.db.init_app(app)  
 
@@ -61,6 +65,10 @@ swaggerui_blueprint = get_swaggerui_blueprint(
 app.register_blueprint(swaggerui_blueprint)
 
 limiter = Limiter(get_remote_address, app=app)
+
+def allowed_file(filename):
+    """Check if the file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def decode_jwt(token):
     try:
@@ -200,6 +208,42 @@ def handle_send_message(data):
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat()
     }, room=room_id)  
 
+@app.route('/room/create', methods=['POST'])
+@jwt_required()
+def create_room():
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+
+    room_name = request.form.get('room_name')
+    room_type = request.form.get('room_type')
+    picture = request.files.get('picture')  
+
+    if not room_name or not room_type or not user_id:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    room = models.Room(room_name=room_name, room_type=room_type)
+    models.db.session.add(room)
+    models.db.session.commit()
+
+    room_id = room.room_id
+
+    room_folder_path = os.path.join(app.config['ROOMS_FOLDER'], str(room_id))
+    if not os.path.exists(room_folder_path):
+        os.makedirs(room_folder_path)
+
+    if picture and allowed_file(picture.filename):
+        filename = secure_filename(picture.filename)
+        picture_path = os.path.join(room_folder_path, filename)
+
+        picture.save(picture_path)
+
+        room.room_picture = f'/{room_folder_path}/{filename}'
+        models.db.session.commit()
+
+    room_user = models.RoomUsers(room_id=room_id, user_id=user_id)
+    models.db.session.add(room_user)
+    models.db.session.commit()
+    return jsonify({"message": "Room created successfully", "room_id": room_id, "room_picture": room.room_picture}), 201
 
 @app.route('/room/create_direct_room', methods=['POST'])
 @jwt_required()

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Avatar, Typography, TextField } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Avatar, Typography, TextField, IconButton } from '@mui/material';
 import { useMutation } from '@tanstack/react-query';
+import { PhotoCamera } from '@mui/icons-material';
 
 const formatDate = (dateString) => {
   const date = new Date(dateString);
@@ -15,14 +16,20 @@ const formatDate = (dateString) => {
   });
 };
 
-const updateUserProfile = async (username, email, token) => {
+const updateUserProfile = async (username, email, profilePicture, token) => {
+  const formData = new FormData();
+  formData.append('username', username);
+  formData.append('email', email);
+  if (profilePicture) {
+    formData.append('profile_picture', profilePicture);
+  }
+
   const response = await fetch(`/user/update`, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify({ username, email }),
+    body: formData,
   });
 
   if (response.status === 429) {
@@ -49,9 +56,10 @@ const updateUserProfile = async (username, email, token) => {
 export function UserProfileDialog({ openProfile, handleCloseProfile, user, token, refetchUser }) {
   const [modifiedUsername, setModifiedUsername] = useState(user.username);
   const [modifiedEmail, setModifiedEmail] = useState(user.email);
+  const [newProfilePicture, setNewProfilePicture] = useState(null);
 
   const mutation = useMutation({
-    mutationFn: (updatedUserData) => updateUserProfile(updatedUserData.username, updatedUserData.email, token),
+    mutationFn: (updatedUserData) => updateUserProfile(updatedUserData.username, updatedUserData.email, updatedUserData.profilePicture, token),
     onSuccess: (data) => {
       console.log('Profile updated successfully:', data);
       refetchUser(); 
@@ -63,7 +71,18 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user, token
   });
 
   const handleSave = () => {
-    mutation.mutate({ username: modifiedUsername, email: modifiedEmail });
+    mutation.mutate({ 
+      username: modifiedUsername, 
+      email: modifiedEmail, 
+      profilePicture: newProfilePicture 
+    });
+  };
+
+  const handleProfilePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setNewProfilePicture(file);
+    }
   };
 
   return (
@@ -86,16 +105,40 @@ export function UserProfileDialog({ openProfile, handleCloseProfile, user, token
       </DialogTitle>
       <DialogContent>
         <Box sx={{ paddingBottom: 2, textAlign: "center" }}>
-          <Avatar
-            sx={{
-              backgroundColor: user.profile_picture ? "transparent" : "#5E3F75", 
-              width: 80,
-              height: 80,
-              marginBottom: 2,
-            }}
-            src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
-            alt={`${user.first_name} ${user.last_name}`}
-          />
+          <Box sx={{ position: "relative" }}>
+            <Avatar
+              sx={{
+                backgroundColor: user.profile_picture ? "transparent" : "#5E3F75", 
+                width: 80,
+                height: 80,
+                marginBottom: 2,
+              }}
+              src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
+              alt={`${user.first_name} ${user.last_name}`}
+            />
+            {/* Profile Picture Modify Icon */}
+            <IconButton 
+              component="label"
+              sx={{
+                position: "absolute",
+                bottom: 0,
+                right: 0,
+                backgroundColor: "#5E3F75",
+                padding: 0.5,
+                borderRadius: "50%",
+                '&:hover': { backgroundColor: "#7F4E92" }
+              }}
+            >
+              <PhotoCamera sx={{ color: "white" }} />
+              <input 
+                type="file" 
+                accept="image/*"
+                hidden
+                onChange={handleProfilePictureChange}
+              />
+            </IconButton>
+          </Box>
+
           <Typography variant="h6" sx={{ color: "#E5E7EB" }}>
             {user.first_name} {user.last_name}
           </Typography>
