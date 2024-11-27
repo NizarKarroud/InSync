@@ -299,6 +299,11 @@ export function Chats({ selectedChat, user, token, socket }) {
                         padding: "10px 12px",
                         color: "white",
                     }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();  
+                            handleSendMessage(); 
+                        }}}
                 />
                 <IconButton
                     sx={{
