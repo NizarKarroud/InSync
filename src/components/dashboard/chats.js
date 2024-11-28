@@ -24,7 +24,6 @@ const fetchMessages = async (room_id, token, offset = 0) => {
     }
 
     const data = await response.json();
-    console.log("fetched :" , data.messages)
     return data.messages;
 };
 
@@ -37,9 +36,7 @@ export function Chats({ selectedChat, user, token, socket }) {
         const fetchChatMessages = async () => {
             try {
                 const chatId = selectedChat.room_id;
-                console.log("chat id : " , chatId)
                 const messages = await fetchMessages(chatId, token);
-                console.log("the fetched messages : " , messages)
                 setMessages(messages.reverse());
             } catch (error) {
                 console.error("Error fetching messages:", error);
@@ -62,13 +59,11 @@ export function Chats({ selectedChat, user, token, socket }) {
             }
 
             socket.on("directRoomJoined", (data) => {
-                console.log("Direct room joined:", data);
                 fetchChatMessages();
             });
 
             // Listen for incoming messages
             socket.on("receiveMessage", (message) => {
-                console.log("Received message:", message); 
                 if (message.user_id === user.user_id) {
                     return;
                 }
@@ -104,6 +99,7 @@ export function Chats({ selectedChat, user, token, socket }) {
         setNewMessage("");
     };
 
+
     return (
         <Box
             sx={{
@@ -128,20 +124,21 @@ export function Chats({ selectedChat, user, token, socket }) {
                 }}
             >
                 <Stack direction="row" alignItems="center" spacing={2}>
-                    <Avatar
-                        sx={{ bgcolor: "#5E3F75" }}
-                        src={isGroupChat
-                            ? ""
-                            : selectedChat.users[0].profile_picture
-                            ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}` 
+                <Avatar
+                    sx={{ bgcolor: "#5E3F75" }}
+                    src={
+                        isGroupChat
+                            ? selectedChat.room_picture
+                                ? `http://192.168.100.9:16000/rooms/${selectedChat.room_picture}`
+                                : ""
+                                : selectedChat.users?.[0]?.profile_picture
+                            ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}`
                             : ""
-                        }
-                    >
-                        {isGroupChat
-                            ? selectedChat.room_name[0] 
-                            : ""  
-                        }
-                    </Avatar>
+                    }
+                >
+
+                </Avatar>
+
                     <Box>
                         <Typography
                             variant="subtitle1"
@@ -153,7 +150,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                         </Typography>
                         {isGroupChat ? (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
-                                {selectedChat.users.length} members
+                                {selectedChat.users.length +1} members
                             </Typography>
                         ) : (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
@@ -217,8 +214,11 @@ export function Chats({ selectedChat, user, token, socket }) {
                                         height: 40,
                                         marginRight: 2,
                                     }}
-                                    src={selectedChat.users[0].profile_picture ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}` : ""}
-                                >
+                                    src={
+                                        selectedChat?.users?.[0]?.profile_picture
+                                            ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}`
+                                            : ""
+                                    }                                >
 
                                 </Avatar>
                             )}

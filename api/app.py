@@ -8,12 +8,14 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 
-import os
+import os ,json
 from werkzeug.security import generate_password_hash , check_password_hash
 from dotenv import load_dotenv
 from threading import Thread
 import models
 import datetime 
+
+from cryptography.fernet import Fernet
 
 
 load_dotenv()
@@ -32,7 +34,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files' )
 app.config['USERS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "users" )
 app.config['ROOMS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "rooms" )
 
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}  # Allowed image extensions
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'} 
 
 models.db.init_app(app)  
 
@@ -46,6 +48,7 @@ app.config["JWT_SECRET_KEY"] = os.getenv("SECRET_KEY")
 
 app.config["FRONTEND_URL"] = os.getenv("FRONTEND_URL")
 
+app.config["ROOM_KEY"] = os.getenv("ROOM_KEY")
 
 jwt = JWTManager(app)
 mail = Mail(app)
@@ -66,6 +69,8 @@ app.register_blueprint(swaggerui_blueprint)
 
 limiter = Limiter(get_remote_address, app=app)
 
+cipher_suite = Fernet(app.config["ROOM_KEY"])
+
 def allowed_file(filename):
     """Check if the file extension is allowed."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -82,6 +87,18 @@ def decode_jwt(token):
 def send_email(app, msg):
     with app.app_context():
         mail.send(msg)
+
+def create_encrypted_room_code(room_id, room_name, cipher_suite):
+    room_info = {
+        "room_id": room_id,
+        "room_name": room_name
+    }
+    
+    room_info_json = json.dumps(room_info)
+    
+    encrypted_room_code = cipher_suite.encrypt(room_info_json.encode())
+    
+    return encrypted_room_code
 
 @socketio.on('connect')
 def handle_connect():
@@ -237,7 +254,7 @@ def create_room():
 
         picture.save(picture_path)
 
-        room.room_picture = f'/{room_folder_path}/{filename}'
+        room.room_picture = f'/{room_id}/{filename}'
         models.db.session.commit()
 
     room_user = models.RoomUsers(room_id=room_id, user_id=user_id)
@@ -324,6 +341,22 @@ def get_room_messages(room_id):
         'messages': message_list
     }), 200
 
+
+@app.route("/room/join" , methods=['POST'])
+@jwt_required()
+def join_group() :
+    # decrypted room code '{"room_id" : 1 , "room_name" : "test"}'
+
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    data = request.get_json()
+    room_code = data.get("room_code")
+    decrypted_room_code = cipher_suite.decrypt(room_code).decode()
+    
+    decrypted_room_info = json.loads(decrypted_room_code)
+    return jsonify({"decrypted" : decrypted_room_info})
+    decrypted_room_id = decrypted_room_info["room_id"]
+    decrypted_room_name = decrypted_room_info["room_name"]
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
@@ -437,10 +470,13 @@ def get_user_groups():
             }
             for user in users_in_room
         ]
+        room_code = create_encrypted_room_code(room.room_id , room.room_name ,cipher_suite )
 
         group_rooms.append({
             "room_id": room.room_id,
             "room_name": room.room_name,
+            "room_code" : room_code.decode('utf-8'),
+            "room_picture" : room.room_picture,
             "users": user_data
         })
 
@@ -619,10 +655,15 @@ def update_user():
 def get_notifs():
     pass
 
-
+@app.route("/rooms/<path:name>")
+def download_rooms_file(name):
+    try:
+        return send_from_directory(app.config['ROOMS_FOLDER'], name)
+    except FileNotFoundError:
+        pass
 
 @app.route("/users/<path:name>")
-def download_file(name):
+def download_users_file(name):
     try:
         return send_from_directory(app.config['USERS_FOLDER'], name)
     except FileNotFoundError:

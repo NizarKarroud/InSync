@@ -12,6 +12,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import CircularProgress from '@mui/material/CircularProgress';
 import AddIcon from '@mui/icons-material/Add';
+import Alert from '@mui/material/Alert';
 
 const fetchGroups = async (token) => {
     const response = await fetch("/user/groups", {
@@ -37,7 +38,8 @@ export function Groups({ token, onSelectChat }) {
     const [groupName, setGroupName] = useState("");
     const [uploadedPicture, setUploadedPicture] = useState(null); 
     const [preview, setPreview] = useState(null);
-
+    const [groupCode, setGroupCode] = useState("");
+    
     const { data: groups, isLoading, isError, error } = useQuery({
         queryKey: ['groups', token],
         queryFn: () => fetchGroups(token),
@@ -75,10 +77,35 @@ export function Groups({ token, onSelectChat }) {
         setDialogView("create");
     };
 
-    const handleJoinSubmit = () => {
-        console.log(`Joining group: ${groupName}`);
-        setOpenDialog(false);
-        setGroupName("");
+    const handleJoinSubmit = async () => {
+        if (!groupCode) {
+            alert("Please enter a group code");
+            return;
+        }
+    
+        try {
+            const response = await fetch("/room/join", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({ room_code: groupCode }), 
+            });
+    
+            const result = await response.json();
+    
+            if (response.ok) {
+                alert("Successfully joined the group");
+                setOpenDialog(false); 
+                setGroupCode("");
+            } else {
+                alert(`Error: ${result.error || "Failed to join group"}`);
+            }
+        } catch (error) {
+            console.error("Error joining group:", error);
+            alert("An error occurred while trying to join the group");
+        }
     };
 
     const handleCreateSubmit = async () => {
@@ -175,11 +202,9 @@ export function Groups({ token, onSelectChat }) {
                             bgcolor: "#5E3F75",
                         },
                     }}
+                    src={group.room_picture ? `http://192.168.100.9:16000/rooms/${group.room_picture}` : ""}
+
                 >
-                    {group.room_name
-                        .split(" ")
-                        .map((word) => word[0])
-                        .join("")}
                 </Avatar>
             ))}
 
@@ -278,10 +303,10 @@ export function Groups({ token, onSelectChat }) {
                         }}
                     >
                         <TextField
-                            label="Group Name"
+                            label="Group Code"
                             variant="outlined"
-                            value={groupName}
-                            onChange={(e) => setGroupName(e.target.value)}
+                            value={groupCode}
+                            onChange={(e) => setGroupCode(e.target.value)}
                             fullWidth
                             sx={{
                                 marginBottom: 3,
