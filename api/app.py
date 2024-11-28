@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request , url_for , send_from_directory 
+from flask import Flask, jsonify, render_template, request  , send_from_directory 
 from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity  , decode_token
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo 
@@ -8,7 +8,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 
-import os ,json
+import os ,json , shutil
 from werkzeug.security import generate_password_hash , check_password_hash
 from dotenv import load_dotenv
 from threading import Thread
@@ -217,7 +217,6 @@ def handle_send_message(data):
 
     user_message = models.UserMessage(user_id , room_id , message , "text" ).json
     mongo.db.UserMessages.insert_one(user_message)
-    # Broadcast the message to all users in the room
     emit('receiveMessage', {
         'room_id': room_id,
         'user_id': user_id,
@@ -341,6 +340,49 @@ def get_room_messages(room_id):
         'messages': message_list
     }), 200
 
+@app.route('/room/leave', methods=['POST'])
+@jwt_required()
+def leave_group():
+    try:
+        current_user = get_jwt_identity()
+        user_id = current_user.get("user_id")
+
+        data = request.get_json()
+        room_id = data.get("room_id")
+        if not room_id:
+            return jsonify({"error": "room_id is required"}), 400
+        room_user_entry = models.RoomUsers.query.filter_by(user_id=user_id, room_id=room_id).first()
+        if not room_user_entry:
+            return jsonify({"error": "User is not a member of this room"}), 403
+
+        # Remove the user from the RoomUsers table
+        models.db.session.delete(room_user_entry)
+        models.db.session.commit()
+
+        # Check if any users remain in the room
+        remaining_users = models.RoomUsers.query.filter_by(room_id=room_id).count()
+        if remaining_users == 0:
+            # If no users are left, delete the room
+            room = models.Room.query.get(room_id)
+            if room:
+                models.db.session.delete(room)
+
+                # Check if the room folder exists in the ROOMS_FOLDER
+                room_folder = os.path.join(app.config['ROOMS_FOLDER'], str(room_id))
+                if os.path.exists(room_folder):
+                    # Remove the folder and its contents
+                    shutil.rmtree(room_folder)
+
+            models.db.session.commit()
+
+        return jsonify({"message": "Successfully left the group"}), 200
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        models.db.session.rollback()
+        return jsonify({"error": "An error occurred while leaving the group"}), 500
+
+
 
 @app.route("/room/join" , methods=['POST'])
 @jwt_required()
@@ -349,14 +391,36 @@ def join_group() :
 
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
+
     data = request.get_json()
     room_code = data.get("room_code")
-    decrypted_room_code = cipher_suite.decrypt(room_code).decode()
+    if not room_code:
+        return jsonify({"message": "Room code is required."}), 400
     
-    decrypted_room_info = json.loads(decrypted_room_code)
+    try :
+        decrypted_room_code = cipher_suite.decrypt(room_code).decode()
+        decrypted_room_info = json.loads(decrypted_room_code)
+        room_id = decrypted_room_info["room_id"]
+        room_name = decrypted_room_info["room_name"]
+    except Exception :
+        return jsonify({"message": "Invalid room code."}), 400
+    
+    room_user = models.RoomUsers.query.filter_by(user_id=user_id, room_id=room_id).first()
+    if room_user:
+        return jsonify({"message": "You are already in this room."}), 400
+
+    try:
+        new_room_user = models.RoomUsers(user_id=user_id, room_id=room_id)
+        models.db.session.add(new_room_user)
+        models.db.session.commit()
+
+        return jsonify({
+            "message": f"You have successfully joined the room: {room_name}"}), 200
+    except Exception as e:
+        models.db.session.rollback()
+        return jsonify({"message": "An error occurred while joining the room."}), 500
+
     return jsonify({"decrypted" : decrypted_room_info})
-    decrypted_room_id = decrypted_room_info["room_id"]
-    decrypted_room_name = decrypted_room_info["room_name"]
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
@@ -437,11 +501,9 @@ def get_users():
 @jwt_required()
 @limiter.limit("100 per minute") 
 def get_user_groups():
-    # Get current user's ID from JWT token
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
 
-    # Fetch all group rooms the current user is part of
     group_room_users = models.RoomUsers.query \
         .join(models.Room, models.Room.room_id == models.RoomUsers.room_id) \
         .filter(models.RoomUsers.user_id == user_id, models.Room.room_type == "group") \
@@ -456,7 +518,7 @@ def get_user_groups():
 
         users_in_room = models.User.query \
             .join(models.RoomUsers, models.User.user_id == models.RoomUsers.user_id) \
-            .filter(models.RoomUsers.room_id == room.room_id, models.User.user_id != user_id) \
+            .filter(models.RoomUsers.room_id == room.room_id) \
             .all()
 
         user_data = [
@@ -486,11 +548,9 @@ def get_user_groups():
 @jwt_required()
 @limiter.limit("100 per minute") 
 def get_user_dms():
-    # Get current user's ID from JWT token
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
 
-    # Fetch all direct rooms the current user is part of
     direct_room_users = models.RoomUsers.query \
         .join(models.Room, models.Room.room_id == models.RoomUsers.room_id) \
         .filter(models.RoomUsers.user_id == user_id, models.Room.room_type == "direct") \
@@ -515,7 +575,8 @@ def get_user_dms():
                 "email": user.email,
                 "first_name": user.first_name,
                 "last_name": user.last_name,
-                "profile_picture": user.profile_picture
+                "profile_picture": user.profile_picture,
+                "created_at" : user.created_at
             }
             for user in users_in_room
         ]
@@ -549,7 +610,6 @@ def login():
                 expires_delta=datetime.timedelta(hours=24)
             )
 
-            # Construct response
             response = jsonify({
                 "status": "correct credentials"
             })

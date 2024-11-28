@@ -9,10 +9,9 @@ import {
     Button, 
     TextField 
 } from "@mui/material";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery , useQueryClient  } from '@tanstack/react-query';
 import CircularProgress from '@mui/material/CircularProgress';
 import AddIcon from '@mui/icons-material/Add';
-import Alert from '@mui/material/Alert';
 
 const fetchGroups = async (token) => {
     const response = await fetch("/user/groups", {
@@ -40,6 +39,8 @@ export function Groups({ token, onSelectChat }) {
     const [preview, setPreview] = useState(null);
     const [groupCode, setGroupCode] = useState("");
     
+    const queryClient = useQueryClient();
+
     const { data: groups, isLoading, isError, error } = useQuery({
         queryKey: ['groups', token],
         queryFn: () => fetchGroups(token),
@@ -99,6 +100,8 @@ export function Groups({ token, onSelectChat }) {
                 alert("Successfully joined the group");
                 setOpenDialog(false); 
                 setGroupCode("");
+                queryClient.invalidateQueries(['groups', token]);
+
             } else {
                 alert(`Error: ${result.error || "Failed to join group"}`);
             }
@@ -136,6 +139,8 @@ export function Groups({ token, onSelectChat }) {
                 setOpenDialog(false);
                 setGroupName("");
                 setUploadedPicture(null);
+                queryClient.invalidateQueries(['groups', token]);
+
             } else {
                 alert(`Error: ${result.error || "Failed to create group"}`);
             }

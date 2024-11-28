@@ -6,8 +6,18 @@ import {
     Typography,
     Avatar,
     Stack,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    Card,
+    CardContent,
+    CardActions,
 } from "@mui/material";
 import { Call, Videocam, MoreVert, AttachFile, Send } from "@mui/icons-material";
+import { GroupInfoDialog } from "./groupdial";
+import {useQueryClient  } from '@tanstack/react-query';
 
 const fetchMessages = async (room_id, token, offset = 0) => {
     const url = `/room/messages/${room_id}?offset=${offset}`;
@@ -27,10 +37,15 @@ const fetchMessages = async (room_id, token, offset = 0) => {
     return data.messages;
 };
 
-export function Chats({ selectedChat, user, token, socket }) {
+export function Chats({ selectedChat, user, token, socket ,setchat }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const isGroupChat = 'room_name' in selectedChat;
+    const queryClient = useQueryClient();
+
+    const [openGroupDialog, setOpenGroupDialog] = useState(false);  
+    const [openUserDialog, setOpenUserDialog] = useState(false);
+
     console.log("selected chat :" , selectedChat)
     useEffect(() => {
         const fetchChatMessages = async () => {
@@ -98,8 +113,61 @@ export function Chats({ selectedChat, user, token, socket }) {
     
         setNewMessage("");
     };
+    
+    const handleGroupDialogOpen = () => {
+        setOpenGroupDialog(true); 
+    };
+
+    const handleUserDialogOpen = () => {
+        setOpenUserDialog(true); 
+    };
+
+    const handleClose = () => {
+        setOpenGroupDialog(false);
+        setOpenUserDialog(false); 
+    };
 
 
+    const leaveGroup = async (token, roomId) => {
+        try {
+          const response = await fetch(`/room/leave`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ room_id: roomId }),
+          });
+      
+          if (!response.ok) {
+            throw new Error("Failed to leave the group");
+          }
+      
+          const data = await response.json();
+          console.log("Successfully left the group", data);            
+          queryClient.invalidateQueries(['groups', token]);
+          setchat(null);
+
+          
+          return data;
+        } catch (error) {
+          console.error("Error leaving group:", error.message);
+          throw error;
+        }
+      };
+    
+      const handleLeaveGroup = async () => {
+        try {
+          const roomId = selectedChat.room_id; 
+      
+          const result = await leaveGroup(token, roomId);
+          console.log(result); 
+          handleClose();
+        } catch (error) {
+          console.error("Error leaving group:", error);
+        }
+      };
+      
     return (
         <Box
             sx={{
@@ -150,7 +218,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                         </Typography>
                         {isGroupChat ? (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
-                                {selectedChat.users.length +1} members
+                                {selectedChat.users.length} members
                             </Typography>
                         ) : (
                             <Typography variant="body2" sx={{ color: "#B0B0B0" }}>
@@ -166,7 +234,7 @@ export function Chats({ selectedChat, user, token, socket }) {
                     <IconButton sx={{ color: "#5E3F75" }}>
                         <Videocam />
                     </IconButton>
-                    <IconButton sx={{ color: "#5E3F75" }}>
+                    <IconButton sx={{ color: "#5E3F75" }}  onClick={isGroupChat ? handleGroupDialogOpen : handleUserDialogOpen} >
                         <MoreVert />
                     </IconButton>
                 </Stack>
@@ -315,6 +383,76 @@ export function Chats({ selectedChat, user, token, socket }) {
                     <Send />
                 </IconButton>
             </Box>
+
+
+            {/* Dialog for Group Chat */}
+
+            <GroupInfoDialog open={openGroupDialog} onClose={handleClose} group={selectedChat } users={selectedChat.users} onLeaveGroup={handleLeaveGroup}  />
+
+            {/* Dialog for Dm user */}
+
+            <Dialog
+                open={openUserDialog}
+                onClose={handleClose}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{
+                    sx: {
+                        backgroundColor: "#2D2F32",
+                        color: "white",
+                        borderRadius: "12px",
+                    },
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        borderBottom: "1px solid #333841",
+                        fontWeight: "bold",
+                        marginBottom: 2,
+                    }}
+                >
+                    {selectedChat.users[0].first_name} {selectedChat.users[0].last_name}
+                </DialogTitle>
+                <DialogContent>
+                    <Box sx={{ textAlign: "center", paddingBottom: 2 }}>
+                        <Avatar
+                            sx={{
+                                backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
+                                width: 80,
+                                height: 80,
+                                marginBottom: 2,
+                            }}
+                            src={
+                                selectedChat.users[0].profile_picture
+                                    ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}`
+                                    : ""
+                            }
+                            alt={selectedChat.users[0].username}
+                        />
+                        <Typography variant="h6" sx={{ color: "#E5E7EB" }}>
+                            {selectedChat.users[0].username}
+                        </Typography>
+                        <Typography variant="body2" sx={{ marginTop: 2, color: "#9CA3AF" }}>
+                            <strong>Email:</strong> {selectedChat.users[0].email}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#9CA3AF" }}>
+                            <strong>Role:</strong> {selectedChat.users[0].role}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#9CA3AF" }}>
+                            <strong>Account Created At:</strong>{" "}
+                            {new Date(selectedChat.users[0].created_at).toLocaleDateString()}
+                        </Typography>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ borderTop: "1px solid #333841" }}>
+                    <Button
+                        onClick={handleClose}
+                        sx={{ color: "#9CA3AF", "&:hover": { color: "#5E3F75" } }}
+                    >
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

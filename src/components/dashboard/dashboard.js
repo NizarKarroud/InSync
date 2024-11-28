@@ -118,7 +118,7 @@ export function Dashboard() {
             <Groups token={token} onSelectChat={handleSelectChat} />
             <Dms user={user.user} token={token} onSelectChat={handleSelectChat} refetchUser={refetch} />
             {selectedChat && (
-                <Chats selectedChat={selectedChat} user={user.user} token={token} socket={socket} />
+                <Chats selectedChat={selectedChat} user={user.user} token={token} socket={socket} setchat={setSelectedChat} />
             )}
         </Box>
     );
