@@ -11,11 +11,8 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    Card,
-    CardContent,
-    CardActions,
 } from "@mui/material";
-import { Call, Videocam, MoreVert, AttachFile, Send } from "@mui/icons-material";
+import { Call, Videocam, MoreVert, AttachFile, Send  } from "@mui/icons-material";
 import { GroupInfoDialog } from "./groupdial";
 import {useQueryClient  } from '@tanstack/react-query';
 
@@ -43,10 +40,23 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
     const isGroupChat = 'room_name' in selectedChat;
     const queryClient = useQueryClient();
 
+    const [offset, setOffset] = useState(1); 
+    
+    const [hasMore, setHasMore] = useState(true);
     const [openGroupDialog, setOpenGroupDialog] = useState(false);  
     const [openUserDialog, setOpenUserDialog] = useState(false);
 
-    console.log("selected chat :" , selectedChat)
+    const handleLoadMoreMessages = async () => {
+        setOffset(offset+1)
+        const newMessages = await fetchMessages(selectedChat.room_id , token , offset);
+        newMessages.reverse()
+        if (newMessages.length === 0) {
+            setHasMore(false); 
+        } else {
+            setMessages(prevMessages => [...newMessages, ...prevMessages]);
+        }
+        console.log(messages);
+    };
     useEffect(() => {
         const fetchChatMessages = async () => {
             try {
@@ -58,7 +68,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
             }
         };
 
-        // Join the room for the selected chat based on room_type
         if (socket) {
             if (isGroupChat) {
                 socket.emit("joinRoom", {
@@ -77,7 +86,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                 fetchChatMessages();
             });
 
-            // Listen for incoming messages
             socket.on("receiveMessage", (message) => {
                 if (message.user_id === user.user_id) {
                     return;
@@ -91,6 +99,8 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                 socket.emit("leaveRoom", selectedChat.room_id); 
                 socket.off("receiveMessage"); 
                 setMessages([]);
+                setOffset(1);
+                setHasMore(true);
 
             }
         };
@@ -244,14 +254,39 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
             <Box
                 sx={{
                     flex: 1,
-                    overflowY: "auto",
+                    overflowY: "scroll",  
                     padding: "16px",
                     display: "flex",
                     flexDirection: "column",
                     gap: 2,
                     backgroundColor: "#2D2F33",
+                    position: "relative",  // Ensure this is set for the message box container
+
+
                 }}
             >
+            {/* */}
+            {hasMore && (
+                <IconButton
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10,
+                        fontSize: '12px', 
+                        color: '#B0B0B0', 
+                        padding: '4px',
+                        "&:hover": {
+                            color: '#A0A0A0', 
+                        },
+                    }}
+                    onClick={handleLoadMoreMessages}
+                >
+                    Load More...
+                </IconButton>
+            )}
+
                 {messages.map((message, index) => (
                     <React.Fragment key={index}>
                         {/* Date Separator */}
@@ -263,6 +298,7 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                                     textAlign: "center",
                                     color: "#B0B0B0",
                                     fontSize: "12px",
+                                    marginTop : 4,
                                     marginBottom: "8px",
                                 }}
                             >
@@ -314,6 +350,7 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                                 >
                                     {message.message || ""}  {/* Fallback if content is missing */}
                                 </Typography>
+                                
                                 <Typography
                                     variant="caption"
                                     sx={{
