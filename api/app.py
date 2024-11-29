@@ -422,7 +422,6 @@ def join_group() :
         models.db.session.rollback()
         return jsonify({"message": "An error occurred while joining the room."}), 500
 
-    return jsonify({"decrypted" : decrypted_room_info})
 
 @app.route("/user/current", methods=["GET"])
 @jwt_required()
@@ -670,11 +669,10 @@ def update_user():
     current_user = get_jwt_identity()
     user_id = current_user.get("user_id")
     
-    data = request.get_json()
 
-    username = data.get("username")
-    email = data.get("email")
-
+    username = request.form.get("username")
+    email = request.form.get("email")
+    picture = request.files.get('profile_picture')  
     user = models.User.query.filter_by(user_id=user_id).first()
 
     if not user:
@@ -692,6 +690,21 @@ def update_user():
             return jsonify({"status": "Email already in use"}), 400
         user.email = email
 
+
+    if picture and allowed_file(picture.filename):
+        if user.profile_picture:
+            old_picture_path = os.path.join(app.config['USERS_FOLDER'], user.profile_picture)
+            if os.path.exists(old_picture_path):
+                os.remove(old_picture_path)
+
+        filename = secure_filename(picture.filename)
+        picture_path = os.path.join(app.config['USERS_FOLDER'], filename)
+
+        picture.save(picture_path)
+
+        user.profile_picture = f'{filename}'
+        models.db.session.commit()
+
     models.db.session.commit()
 
     updated_user = {
@@ -701,8 +714,7 @@ def update_user():
         "first_name": user.first_name,
         "last_name": user.last_name,
         "role": user.role,
-        "account_status": user.account_status,
-        "isLogged": user.isLogged,
+        "profile_picture": user.profile_picture,
         "created_at": user.created_at.isoformat()
     }
     access_token = create_access_token(identity={"username": user.username, "user_id": user_id} , expires_delta= datetime.timedelta(hours=24))
