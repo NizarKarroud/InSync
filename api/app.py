@@ -208,6 +208,7 @@ def handle_send_message(data):
         return
 
     user_id = user_payload["sub"]['user_id']
+    user = models.User.query.filter_by(user_id=user_id).first()    
     room_id = data.get('room_id')
     message = data.get('message')
 
@@ -219,6 +220,7 @@ def handle_send_message(data):
     mongo.db.UserMessages.insert_one(user_message)
     emit('receiveMessage', {
         'room_id': room_id,
+        'username' : user.username,
         'user_id': user_id,
         'message': message,
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -728,6 +730,67 @@ def download_users_file(name):
         return send_from_directory(app.config['USERS_FOLDER'], name)
     except FileNotFoundError:
         pass
+
+@app.route("/user/dms/initiate", methods=['POST'])
+@jwt_required()
+@limiter.limit("10 per minute")
+def create_dm_room():
+    current_user = get_jwt_identity()
+    user_id = current_user.get("user_id")
+    
+    data = request.get_json()
+    print(data)
+    recipient = data.get("recipient")
+
+    recipient = models.User.query.filter_by(user_id=recipient.get("user_id")).first()
+    if not recipient:
+        return jsonify({"error": "Recipient does not exist."}), 404
+
+    existing_room = (
+        models.Room.query
+        .filter_by(room_type="direct")
+        .join(models.RoomUsers, models.Room.room_id == models.RoomUsers.room_id)
+        .filter(models.RoomUsers.user_id.in_([user_id, recipient.user_id]))
+        .group_by(models.Room.room_id)
+        .having(models.db.func.count(models.RoomUsers.user_id) == 2)
+        .first()
+    )
+    user_data = [
+        {
+            "user_id": recipient.user_id,
+            "username": recipient.username,
+            "email": recipient.email,
+            "first_name": recipient.first_name,
+            "last_name": recipient.last_name,
+            "profile_picture": recipient.profile_picture,
+            "created_at" : recipient.created_at,
+            "role" : recipient.role
+        }
+    ]   
+
+    if existing_room:
+        return jsonify({
+            "room_id": existing_room.room_id,
+            "users" : user_data
+        }), 200
+    
+    new_room = models.Room(
+        room_type="direct",
+        room_name=None, 
+    )
+    models.db.session.add(new_room)
+    models.db.session.flush()  
+
+    models.db.session.add(models.RoomUsers(user_id=user_id, room_id=new_room.room_id))
+    models.db.session.add(models.RoomUsers(user_id=recipient.user_id, room_id=new_room.room_id))
+
+    models.db.session.commit()
+
+    return jsonify({
+        "room_id": new_room.room_id,
+        "users" : user_data
+    }), 200
+    
 
 @app.route('/user/forgotpwd' , methods=['POST'])
 @limiter.limit("2 per minute") 

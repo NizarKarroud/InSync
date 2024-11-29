@@ -9,8 +9,8 @@ import {
   IconButton,
   CircularProgress,
 } from "@mui/material";
-import { PeopleAlt, ListAlt, SettingsOutlined } from "@mui/icons-material";
-import { useQuery } from "@tanstack/react-query";
+import { PeopleAlt, ListAlt, SettingsOutlined, Recommend } from "@mui/icons-material";
+import { useQuery  , useQueryClient} from "@tanstack/react-query";
 import { UserProfileDialog } from "./settingdial";
 import { UserListDialog } from "./userdial";
 
@@ -79,16 +79,44 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
   const [openUsersDialog, setOpenUsersDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");  
 
+  const queryClient = useQueryClient();
+
   const handleSettingsClick = () => setOpenProfile(true);
   const handleCloseProfile = () => setOpenProfile(false);
 
   const handleOpenUsersDialog = () => setOpenUsersDialog(true);
   const handleCloseUsersDialog = () => setOpenUsersDialog(false);
 
-  const handleSendMessage = (selectedUser) => {
+  const handleSendMessage = async (selectedUser) => {
+    console.log(selectedUser);
+
+    try {
+          const response = await fetch("/user/dms/initiate", {
+              method: "POST",
+              headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ recipient: selectedUser }),
+          });
+
+          if (!response.ok) {
+              throw new Error(`Failed to initiate DM, status: ${response.status}`);
+          }
+
+          const roomData = await response.json();
+          console.log(roomData)
+
+          onSelectChat(roomData);
+
+          queryClient.invalidateQueries(["dms"]);
+      } 
+      catch (error) {
+          console.error("Error initiating DM:", error);
+      }
     handleCloseUsersDialog();
-    onSelectChat(selectedUser);
-  };
+
+      };
 
   const filterDms = (dms, query) => {
     if (!query) return dms; 

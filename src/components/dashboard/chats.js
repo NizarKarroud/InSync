@@ -41,7 +41,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
     const queryClient = useQueryClient();
 
     const [offset, setOffset] = useState(1); 
-    
     const [hasMore, setHasMore] = useState(true);
     const [openGroupDialog, setOpenGroupDialog] = useState(false);  
     const [openUserDialog, setOpenUserDialog] = useState(false);
@@ -177,7 +176,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
           console.error("Error leaving group:", error);
         }
       };
-      
     return (
         <Box
             sx={{
@@ -348,7 +346,7 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                                         color: "rgba(255, 255, 255, 0.9)",
                                     }}
                                 >
-                                    {message.message || ""}  {/* Fallback if content is missing */}
+                                    {message.message || ""}  {/*  if content is missing */}
                                 </Typography>
                                 
                                 <Typography
@@ -360,7 +358,12 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                                         fontSize: "10px",
                                         color: "#B0B0B0",
                                     }}
-                                >
+                                >   
+                                    { 
+                                    message.username || 
+                                    selectedChat.users?.find(user => user.user_id == message.user_id)?.username  }
+                                    {"   "}
+
                                     {new Date(message.timestamp).toLocaleTimeString([], {
                                         hour: "2-digit",
                                         minute: "2-digit",
