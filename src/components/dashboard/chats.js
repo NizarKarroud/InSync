@@ -12,7 +12,7 @@ import {
     DialogActions,
     Button,
 } from "@mui/material";
-import { Call, Videocam, MoreVert, AttachFile, Send  } from "@mui/icons-material";
+import {MoreVert, AttachFile, Send  } from "@mui/icons-material";
 import { GroupInfoDialog } from "./groupdial";
 import {useQueryClient  } from '@tanstack/react-query';
 
@@ -31,6 +31,7 @@ const fetchMessages = async (room_id, token, offset = 0) => {
     }
 
     const data = await response.json();
+    console.log(data.messages)
     return data.messages;
 };
 
@@ -112,11 +113,12 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
             room_id: selectedChat.room_id,
             user_id: user.user_id,
             message: newMessage,
+            message_type : "text" ,
             timestamp: new Date(),
         };
     
         // Emit the message to the server
-        socket.emit("sendDM", message);
+        socket.emit("sendMessage", message);
     
         setMessages((prevMessages) => [...prevMessages, message]);
     
@@ -135,7 +137,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
         setOpenGroupDialog(false);
         setOpenUserDialog(false); 
     };
-
 
     const leaveGroup = async (token, roomId) => {
         try {
@@ -176,6 +177,66 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
           console.error("Error leaving group:", error);
         }
       };
+
+
+      const handleFileUpload = async (event) => {
+        const file = event.target.files[0];
+    
+        if (file) {
+            const maxSize = 100 * 1024 * 1024; 
+            if (file.size > maxSize) {
+                alert("File size exceeds 100 MB. Please choose a smaller file.");
+                return;
+            }
+    
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('name', file.name);
+            formData.append('size', file.size);
+            
+            const roomId = selectedChat.room_id; 
+    
+            try {
+                const response = await fetch(`/room/upload/${roomId}`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: formData,
+                });
+    
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert(`Error: ${data.error}`);
+                } else {
+                    const data = await response.json();
+                    console.log(data)
+                    alert(`File uploaded successfully`);
+    
+                    const file_message = {
+                        room_id: selectedChat.room_id,
+                        user_id: user.user_id,
+                        message: "",
+                        message_type :"file",
+                        timestamp: new Date(),
+                        attachments: { 
+                            link: data.link, 
+                            name: data.name, 
+                            size: data.size 
+                        }
+                    };
+                    console.log(file_message)
+                    socket.emit("sendMessage", file_message); 
+                    setMessages((prevMessages) => [...prevMessages, file_message]);
+
+                }
+            } catch (error) {
+                console.error('File upload failed:', error);
+                alert('File upload failed');
+            }
+        }
+    };
+    
     return (
         <Box
             sx={{
@@ -236,12 +297,6 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                     </Box>
                 </Stack>
                 <Stack direction="row" spacing={1}>
-                    <IconButton sx={{ color: "#5E3F75" }}>
-                        <Call />
-                    </IconButton>
-                    <IconButton sx={{ color: "#5E3F75" }}>
-                        <Videocam />
-                    </IconButton>
                     <IconButton sx={{ color: "#5E3F75" }}  onClick={isGroupChat ? handleGroupDialogOpen : handleUserDialogOpen} >
                         <MoreVert />
                     </IconButton>
@@ -285,59 +340,57 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                 </IconButton>
             )}
 
-                {messages.map((message, index) => (
-                    <React.Fragment key={index}>
-                        {/* Date Separator */}
-                        {index === 0 ||
-                        new Date(messages[index - 1]?.timestamp).toDateString() !==
-                            new Date(message.timestamp).toDateString() ? (
-                            <Box
-                                sx={{
-                                    textAlign: "center",
-                                    color: "#B0B0B0",
-                                    fontSize: "12px",
-                                    marginTop : 4,
-                                    marginBottom: "8px",
-                                }}
-                            >
-                                {new Date(message.timestamp).toDateString()}
-                            </Box>
-                        ) : null}
-                        {/* Message Bubble */}
-                        <Stack
-                            direction="row"
-                            justifyContent={message.user_id === user.user_id ? "flex-end" : "flex-start"}
+            {messages.map((message, index) => (
+                <React.Fragment key={index}>
+                    {/* Date Separator */}
+                    {index === 0 ||
+                    new Date(messages[index - 1]?.timestamp).toDateString() !==
+                        new Date(message.timestamp).toDateString() ? (
+                        <Box
+                            sx={{
+                                textAlign: "center",
+                                color: "#B0B0B0",
+                                fontSize: "12px",
+                                marginTop: 4,
+                                marginBottom: "8px",
+                            }}
                         >
-                            {message.user_id !== user.user_id && (
-                                <Avatar
-                                    sx={{
-                                        backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
-                                        width: 40,
-                                        height: 40,
-                                        marginRight: 2,
-                                    }}
-                                    src={
-                                        selectedChat?.users?.[0]?.profile_picture
-                                            ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}`
-                                            : ""
-                                    }                                >
-
-                                </Avatar>
-                            )}
-                            <Box
+                            {new Date(message.timestamp).toDateString()}
+                        </Box>
+                    ) : null}
+                    {/* Message Bubble */}
+                    <Stack
+                        direction="row"
+                        justifyContent={message.user_id === user.user_id ? "flex-end" : "flex-start"}
+                    >
+                        {message.user_id !== user.user_id && (
+                            <Avatar
                                 sx={{
-                                    padding: "12px",
-                                    borderRadius: "16px",
-                                    backgroundColor:
-                                        message.user_id === user.user_id
-                                            ? "#3A455A"
-                                            : "#1E2A37",
-                                    color: "white",
-                                    maxWidth: "70%",
-                                    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                                    wordWrap: "break-word",
+                                    backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
+                                    width: 40,
+                                    height: 40,
+                                    marginRight: 2,
                                 }}
-                            >
+                                src={
+                                    selectedChat?.users?.[0]?.profile_picture
+                                        ? `http://192.168.100.9:16000/users/${selectedChat.users[0].profile_picture}`
+                                        : ""
+                                }
+                            />
+                        )}
+                        <Box
+                            sx={{
+                                padding: "12px",
+                                borderRadius: "16px",
+                                backgroundColor:
+                                    message.user_id === user.user_id ? "#3A455A" : "#1E2A37",
+                                color: "white",
+                                maxWidth: "70%",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                                wordWrap: "break-word",
+                            }}
+                        >
+                            {message.message_type === "text" ? (
                                 <Typography
                                     variant="body1"
                                     sx={{
@@ -346,33 +399,70 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                                         color: "rgba(255, 255, 255, 0.9)",
                                     }}
                                 >
-                                    {message.message || ""}  {/*  if content is missing */}
+                                    {message.message || ""}
                                 </Typography>
-                                
-                                <Typography
-                                    variant="caption"
+                            ) : (
+                                <Box
                                     sx={{
-                                        display: "block",
-                                        marginTop: "4px",
-                                        textAlign: "right",
-                                        fontSize: "10px",
-                                        color: "#B0B0B0",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                        backgroundColor: "#2D2F33",
+                                        padding: "8px",
+                                        borderRadius: "12px",
                                     }}
-                                >   
-                                    { 
-                                    message.username || 
-                                    selectedChat.users?.find(user => user.user_id == message.user_id)?.username  }
-                                    {"   "}
+                                >
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            fontSize: "14px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            color: "#B0B0B0",
+                                            textDecoration: "underline",
+                                            cursor: "pointer",
+                                        }}
+                                        onClick={() => window.open(message.attachments?.link, "_blank")}
+                                    >
+                                        [🗎 {message.attachments?.name || "Unknown File"}]
+                                    </Typography>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            fontSize: "12px",
+                                            color: "#B0B0B0",
+                                        }}
+                                    >
+                                        {message.attachments?.size || "Unknown Size"}
+                                    </Typography>
+                                </Box>
+                            )}
 
-                                    {new Date(message.timestamp).toLocaleTimeString([], {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                    })}
-                                </Typography>
-                            </Box>
-                        </Stack>
-                    </React.Fragment>
-                ))}
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    display: "block",
+                                    marginTop: "4px",
+                                    textAlign: "right",
+                                    fontSize: "10px",
+                                    color: "#B0B0B0",
+                                }}
+                            >
+                                {message.username ||
+                                    selectedChat.users?.find(
+                                        (user) => user.user_id == message.user_id
+                                    )?.username}
+                                {"   "}
+                                {new Date(message.timestamp).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                })}
+                            </Typography>
+                        </Box>
+                    </Stack>
+                </React.Fragment>
+            ))}
+
             </Box>
 
             {/* Bottom Input Section */}
@@ -386,9 +476,19 @@ export function Chats({ selectedChat, user, token, socket ,setchat }) {
                     borderTop: "1px solid #444",
                 }}
             >
-                <IconButton sx={{ color: "#5E3F75" }}>
-                    <AttachFile />
-                </IconButton>
+            <IconButton 
+                sx={{ color: "#5E3F75" }}
+                onClick={() => document.getElementById("fileInput").click()}
+            >
+                <AttachFile />
+                <input
+                    id="fileInput"
+                    type="file"
+                    hidden
+                    onChange={handleFileUpload}
+                />
+            </IconButton>
+
                 <TextField
                     fullWidth
                     variant="standard"

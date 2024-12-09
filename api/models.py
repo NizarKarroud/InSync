@@ -52,7 +52,7 @@ class UserMessage:
         self.timestamp =  datetime.now(timezone.utc)
         self.message_text = message_text  
         self.message_type = message_type  #"text",  // e.g., text, file
-        self.attachments = attachments   # "static/files/rooms/room_id/file.extension" 
+        self.attachments = attachments   # in  "static/files/rooms/room_id/file.extension" , keep the file.ext
     
     @property
     def json(self):

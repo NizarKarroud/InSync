@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request  , send_from_directory 
+from flask import Flask, jsonify, render_template, request, abort , send_from_directory 
 from flask_jwt_extended import create_access_token , JWTManager ,jwt_required , get_jwt_identity  , decode_token
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_pymongo import PyMongo 
@@ -6,6 +6,8 @@ from flask_mail import Mail , Message
 from flask_socketio import SocketIO, emit , disconnect , join_room, leave_room
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
+
 from werkzeug.utils import secure_filename
 
 import os ,json , shutil
@@ -21,6 +23,7 @@ from cryptography.fernet import Fernet
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 
 
 socketio = SocketIO(app, cors_allowed_origins=["http://192.168.100.9:3000"])
@@ -34,7 +37,14 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'files' )
 app.config['USERS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "users" )
 app.config['ROOMS_FOLDER'] = os.path.join(app.root_path, 'static', 'files' , "rooms" )
 
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'} 
+app.config['ALLOWED_EXTENSIONS'] = {
+    'png', 'jpg', 'jpeg', 'gif',        # Image files
+    'pdf', 'doc', 'docx', 'ppt', 'pptx', 'txt', 'xls', 'xlsx', 'csv',  # Document files
+    'mp3', 'wav', 'ogg', 'flac',         # Audio files
+    'mp4', 'mkv', 'avi', 'mov', 'webm',  # Video files
+    'zip', 'tar', 'gz', 'rar', '7z'      # Compressed files
+}
+app.config["MAX_SIZE"] = 100 * 1024 * 1024  
 
 models.db.init_app(app)  
 
@@ -195,7 +205,7 @@ def leave_room_event(data):
 
     emit('left_room', {'message': f'You have left the room {room_id}'})
 
-@socketio.on('sendDM')
+@socketio.on('sendMessage')
 def handle_send_message(data):
     token = request.args.get('token')
     if not token:
@@ -210,21 +220,50 @@ def handle_send_message(data):
     user_id = user_payload["sub"]['user_id']
     user = models.User.query.filter_by(user_id=user_id).first()    
     room_id = data.get('room_id')
-    message = data.get('message')
 
-    if not room_id or not message:
-        emit('error', {'message': 'Room ID and message are required!'})
+    if not room_id:
+        emit('error', {'message': 'Room ID is required!'})
         return
 
-    user_message = models.UserMessage(user_id , room_id , message , "text" ).json
+    attachments = data.get('attachments')  
+    message = data.get('message')
+
+    if not message and not attachments:
+        emit('error', {'message': 'Either a message or an attachments is required!'})
+        return
+
+    if attachments:
+        message_type='file'
+        attachment_name = attachments.get('name')  
+        attachment_link = attachments.get("link")
+        attachment_size = attachments.get('size') 
+        user_message = models.UserMessage(user_id , room_id , "" , "file" , {'name': attachment_name,'link': attachment_link,'size': attachment_size} ).json
+    else:
+        message_type='text'
+        user_message = models.UserMessage(user_id , room_id , message , "text" ).json
+
+
+
     mongo.db.UserMessages.insert_one(user_message)
-    emit('receiveMessage', {
+
+    emit_data = {
         'room_id': room_id,
-        'username' : user.username,
+        'username': user.username,
         'user_id': user_id,
-        'message': message,
+        'message_type': message_type,
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat()
-    }, room=room_id)  
+    }
+
+    if message_type == "file":
+        emit_data['attachments'] = {
+            'name': attachment_name,
+            'link': attachment_link,
+            'size': attachment_size
+        }
+    else:
+        emit_data['message'] = message
+
+    emit('receiveMessage', emit_data, room=room_id)
 
 @app.route('/room/create', methods=['POST'])
 @jwt_required()
@@ -311,6 +350,44 @@ def create_direct_room():
     }), 201
 
 
+@app.route('/room/upload/<int:room_id>', methods=['POST'])
+@jwt_required()
+def upload_file(room_id):
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No filename provided'}), 400
+
+    file.seek(0, os.SEEK_END)  # Move to the end of the file
+    file_size = file.tell()  # Get the size of the file
+    file.seek(0)  # Reset the file pointer to the beginning
+
+    if file_size > app.config["MAX_SIZE"]:
+        return jsonify({'error': 'File size exceeds 100 MB'}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({'error': 'File type not allowed'}), 400
+    
+    filename = secure_filename(file.filename)
+
+    room_folder = os.path.join(app.config["ROOMS_FOLDER"], str(room_id))
+    os.makedirs(room_folder, exist_ok=True)
+    save_path = os.path.join(room_folder, filename)
+
+    file.save(save_path)
+
+    file_size = os.path.getsize(save_path)
+
+    file_url = f"http://192.168.100.9:16000/static/files/rooms/{room_id}/{filename}"
+    
+    return jsonify({
+        'link': file_url,
+        'name': filename,
+        'size': file_size
+    }), 200
+
 @app.route('/room/messages/<int:room_id>', methods=['GET'])
 @jwt_required()
 def get_room_messages(room_id):
@@ -319,25 +396,44 @@ def get_room_messages(room_id):
 
     offset = int(request.args.get('offset', 0))
 
-    # Calculate the number of messages to skip (20 messages per offset)
     skip = offset * 20
 
-    # Retrieve the 20 latest messages from the UserMessages collection for the given room
     messages = mongo.db.UserMessages.find(
         {'room_id': room_id}
     ).sort('timestamp', -1).skip(skip).limit(20)
 
-    message_list = [
-        {
+    # Function to get file size
+    def get_file_size(file_path):
+        try:
+            return os.path.getsize(file_path)
+        except FileNotFoundError:
+            return None
+
+    base_folder = os.path.join(app.config["ROOMS_FOLDER"], str(room_id))
+
+    message_list = []
+    for message in messages:
+        message_data = {
             'user_id': message['sender_id'],
             'room_id': message['room_id'],
             'message': message['message'],
             'message_type': message['message_type'],
             'timestamp': message['timestamp']
         }
-        for message in messages
-    ]
-    
+
+        if 'attachments' in message:
+            print(message["attachments"])
+            attachment_name = message['attachments']["name"]
+            file_path = os.path.join(base_folder, attachment_name)
+
+            message_data['attachments'] = {
+                'name': attachment_name,
+                'link': f"http://192.168.100.9:16000/static/files/rooms/{room_id}/{attachment_name}",
+                'size': get_file_size(file_path)
+            }
+
+        message_list.append(message_data)
+
     return jsonify({
         'messages': message_list
     }), 200
@@ -601,6 +697,7 @@ def login():
     user_availability = models.User.query.filter_by(username=username).first()
     if user_availability : 
         hashed_password = user_availability.password
+        is_valid = check_password_hash(hashed_password , password) 
         if check_password_hash(hashed_password , password):
             login_attempt = models.LoginAttempt(username , user_ip , True).json
             mongo.db.login_attempts.insert_one(login_attempt)
@@ -729,19 +826,21 @@ def update_user():
 def get_notifs():
     pass
 
-@app.route("/rooms/<path:name>")
-def download_rooms_file(name):
-    try:
-        return send_from_directory(app.config['ROOMS_FOLDER'], name)
-    except FileNotFoundError:
-        pass
 
 @app.route("/users/<path:name>")
 def download_users_file(name):
     try:
         return send_from_directory(app.config['USERS_FOLDER'], name)
     except FileNotFoundError:
-        pass
+        abort(404)
+
+@app.route("/rooms/<room_id>/<name>")
+def get_room_file(room_id, name):
+    try:
+        directory_path = os.path.join(app.config['ROOMS_FOLDER'], room_id)
+        return send_from_directory(directory_path, name)
+    except FileNotFoundError:
+        abort(404)
 
 @app.route("/user/dms/initiate", methods=['POST'])
 @jwt_required()
@@ -822,7 +921,7 @@ def forgot_password():
         user_id = email_availability.user_id
         access_token = create_access_token(identity={"username": username, "user_id": user_id} , expires_delta= datetime.timedelta(minutes=20))
 
-        reset_link  = "https://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
+        reset_link  = "http://" +app.config["FRONTEND_URL"]+ "/reset_password/?token=" +access_token
     
         html_content = render_template('new-email.html', reset_link=reset_link)
 
