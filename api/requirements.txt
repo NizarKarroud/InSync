@@ -1,0 +1,12 @@
+Flask
+Flask-SQLAlchemy
+Flask-JWT-Extended
+Flask-Swagger-UI
+Flask-PyMongo
+Flask-Mail
+Flask-SocketIO
+Flask-Limiter
+Flask-Cors
+Werkzeug
+python-dotenv
+cryptography

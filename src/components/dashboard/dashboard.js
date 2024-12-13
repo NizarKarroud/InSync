@@ -29,6 +29,7 @@ export function Dashboard() {
     const [selectedChat, setSelectedChat] = useState(null); 
     const token = localStorage.getItem("token");
     const [socket, setSocket] = useState(null); 
+    const [notifications, setNotifications] = useState([]);
 
     const { data: user, isLoading, isError, error, refetch } = useQuery({
         queryKey: ["user", token],
@@ -59,8 +60,11 @@ export function Dashboard() {
             });
 
             newSocket.on("directRoomJoined", (data) => {
-                console.log("Received directRoomJoined event: ", data);
                 alert(`You have joined the room ${data.room_id}: ${data.message}`);
+            });
+            // / Listen for new notifications
+            newSocket.on("notification", (notification) => {
+                setNotifications((prev) => [...prev, notification]);
             });
 
             return () => {
@@ -71,6 +75,12 @@ export function Dashboard() {
         }
     }, [token]);
 
+    const handleLogout = () => {
+        localStorage.removeItem("token")
+        disconnectSocket();
+
+        navigate("/")
+      }
     // Cleanup WebSocket on component unmount
     useEffect(() => {
         return () => {
@@ -116,7 +126,7 @@ export function Dashboard() {
             }}
         >
             <Groups token={token} onSelectChat={handleSelectChat} />
-            <Dms user={user.user} token={token} onSelectChat={handleSelectChat} refetchUser={refetch} />
+            <Dms user={user.user} token={token} onSelectChat={handleSelectChat} refetchUser={refetch} notifications={notifications} setnotif={setNotifications} logout={handleLogout} />
             {selectedChat && (
                 <Chats selectedChat={selectedChat} user={user.user} token={token} socket={socket} setchat={setSelectedChat} />
             )}

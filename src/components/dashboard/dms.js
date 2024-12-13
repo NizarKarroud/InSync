@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, {useEffect, useState  } from "react";
+import { useNavigate } from "react-router-dom";
+
 import {
   Box,
   Divider,
@@ -7,12 +9,14 @@ import {
   Typography,
   Avatar,
   IconButton,
-  CircularProgress,
+  CircularProgress,Badge, Menu, MenuItem
 } from "@mui/material";
-import { PeopleAlt, ListAlt, SettingsOutlined, Recommend } from "@mui/icons-material";
+import { PeopleAlt, ListAlt, SettingsOutlined, Logout  } from "@mui/icons-material";
 import { useQuery  , useQueryClient} from "@tanstack/react-query";
 import { UserProfileDialog } from "./settingdial";
 import { UserListDialog } from "./userdial";
+
+import NotificationsIcon from "@mui/icons-material/Notifications";
 
 const fetchDms = async (token) => {
   const response = await fetch("/user/dms", {
@@ -29,6 +33,24 @@ const fetchDms = async (token) => {
 
   const data = await response.json();
   return data.direct_rooms;
+};
+
+const fetchNotifications = async (token) => {
+  const response = await fetch("/user/notifications", {
+      method: "GET",
+      headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+      },
+  });
+
+  if (!response.ok) {
+      throw new Error(`Failed to fetch notifications, status: ${response.status}`);
+  }
+
+  const Data = await response.json();
+  console.log(Data);
+  return Data.notifications;
 };
 
 function DM({ dm, onSelectChat }) {
@@ -68,7 +90,7 @@ function DM({ dm, onSelectChat }) {
   );
 }
 
-export function Dms({ user, token, onSelectChat, refetchUser }) {
+export function Dms({ user, token, onSelectChat, refetchUser , notifications ,setnotif , logout }) {
   const { data: dms, isLoading, isError, error } = useQuery({
     queryKey: ["dms", token],
     queryFn: () => fetchDms(token),
@@ -80,6 +102,7 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
   const [searchQuery, setSearchQuery] = useState("");  
 
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const handleSettingsClick = () => setOpenProfile(true);
   const handleCloseProfile = () => setOpenProfile(false);
@@ -87,8 +110,19 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
   const handleOpenUsersDialog = () => setOpenUsersDialog(true);
   const handleCloseUsersDialog = () => setOpenUsersDialog(false);
 
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  
+  useEffect(() => {
+    if (token) {
+        fetchNotifications(token)
+            .then((notifications) => setnotif(notifications))
+            .catch((err) => console.error(err));
+      }
+
+  }, [token]);
+
   const handleSendMessage = async (selectedUser) => {
-    console.log(selectedUser);
 
     try {
           const response = await fetch("/user/dms/initiate", {
@@ -131,6 +165,34 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
 
   const filteredDms = dms ? filterDms(dms, searchQuery) : [];
 
+  
+  const handleNotificationClick =  (event) => {
+    setAnchorEl(event.currentTarget);
+
+
+  };
+
+  const handleMenuClose = async () => {
+    try {
+      const response = await fetch("/user/notifications/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to clear notifications, status: ${response.status}`);
+      }
+  
+      setnotif([]); 
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+    setAnchorEl(null);
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
@@ -142,6 +204,16 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
   if (isError) {
     return <div>Error: {error.message}</div>;
   }
+    const groupedNotifications = notifications.reduce((acc, notif) => {
+      // If room_id is not in the accumulator, add it with an empty array
+      if (!acc[notif.room_id]) {
+          acc[notif.room_id] = [];
+      }
+      // Push the current notification to the appropriate room_id group
+      acc[notif.room_id].push(notif);
+      return acc;
+  }, {});
+
 
   return (
     <Box
@@ -158,6 +230,14 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
       {/* Main Content */}
       <Stack sx={{ padding: 2, flex: 1, overflow: "hidden" }}>
         {/* Search Bar */}
+        <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{
+          marginBottom: 2,
+        }}
+      >
         <TextField
           placeholder="Search"
           variant="outlined"
@@ -179,6 +259,36 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)} 
         />
+        
+        <Box>
+                <IconButton
+                    size="large"
+                    aria-label="show notifications"
+                    color="inherit"
+                    onClick={handleNotificationClick}
+                >
+                    <Badge badgeContent={notifications.length} color="error">
+                        <NotificationsIcon />
+                    </Badge>
+                </IconButton>
+                <Menu
+                    anchorEl={anchorEl}
+                    open={Boolean(anchorEl)}
+                    onClose={handleMenuClose}
+                >
+                    {notifications.length === 0 ? (
+                        <MenuItem>No Notifications</MenuItem>
+                    ) : (
+                      Object.keys(groupedNotifications).map((room_id) => (
+                        <MenuItem key={room_id}>
+                            You got {groupedNotifications[room_id].length} messages from {groupedNotifications[room_id][0].room_name}
+                        </MenuItem>
+                    ))
+                    )}
+                </Menu>
+        </Box>
+      </Stack>
+
         <Divider sx={{ borderBottomWidth: 2, borderColor: "#5E3F75" }} />
 
         {/* Users Section */}
@@ -243,11 +353,13 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
         sx={{
           padding: 2,
           backgroundColor: "#2D2F32",
+          boxShadow: "0px -2px 4px rgba(0, 0, 0, 0.25)",
           display: "flex",
           alignItems: "center",
-          borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+          justifyContent: "space-between",
         }}
       >
+        <Stack direction="row" spacing={2} alignItems="center">
         <Avatar
           sx={{
             backgroundColor: user.profile_picture ? "transparent" : "#5E3F75",
@@ -258,13 +370,17 @@ export function Dms({ user, token, onSelectChat, refetchUser }) {
           src={user?.profile_picture ? `http://192.168.100.9:16000/users/${user.profile_picture}` : ""}
         >
         </Avatar>
+        <Typography variant="body1" color="white">{user?.username}</Typography>
+        </Stack>
 
-        <Typography sx={{ color: "white", fontWeight: "bold", marginRight: 1 }}>
-          {user.username}
-        </Typography>
-        <IconButton onClick={handleSettingsClick} sx={{ color: "white", ml: "auto" }}>
-          <SettingsOutlined />
-        </IconButton>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <IconButton onClick={handleSettingsClick} size="large" color="inherit">
+            <SettingsOutlined style={{ color: "white" }} />
+          </IconButton>
+          <IconButton onClick={logout} size="large" color="inherit">
+            <Logout style={{ color: "white" }} />
+          </IconButton>
+        </Stack>
       </Box>
 
       {/* User Profile Dialog */}

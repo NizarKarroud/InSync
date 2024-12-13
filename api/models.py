@@ -29,6 +29,7 @@ class Registration:
             "role": self.role
         }
 
+
 class LoginAttempt:
     def __init__(self, username, ip_address, success):
         self.attempt_time = datetime.now(timezone.utc)
@@ -67,6 +68,59 @@ class UserMessage:
             message_dict["attachments"] = self.attachments
         return message_dict
     
+
+class Notifications:
+    def __init__(self,user_id  , room_id, room_name ):
+        self.room_id = room_id
+        self.user_id = user_id
+        self.timestamp =  datetime.now(timezone.utc)
+        self.room_name = room_name
+    
+    @property
+    def json(self):
+        notif = {
+            "user_id" : self.user_id,
+            "room_id": self.room_id,
+            "room_name": self.room_name,
+            "timestamp": self.timestamp,
+        }
+
+        return notif   
+
+class OnlineUsers:
+    def __init__(self, user_id):
+        self.user_id = user_id
+
+    @property
+    def json(self):
+        return {
+            "user_id": self.user_id,
+        }
+
+class UserSockets:
+    def __init__(self, user_id, socket_id):
+        self.user_id = user_id
+        self.socket_id = socket_id
+
+    @property
+    def json(self):
+        return {
+            "user_id": self.user_id,
+            "socket_id": self.socket_id
+        }
+
+class JoinedUsers:
+    def __init__(self, room_id, user_id):
+        self.room_id = room_id
+        self.user_id = user_id
+
+    @property
+    def json(self):
+        return {
+            "room_id": self.room_id,
+            "user_id": self.user_id
+        }
+
 class User(db.Model):
     __tablename__ = "Users"
     user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)

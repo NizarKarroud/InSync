@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "InSync API",
-    "description": "This API allows user management for registration, login, password recovery, profile updates, and user group management. It supports functionalities like user authentication,  password reset, file downloads, and user and group retrieval.",
+    "description": "This API allows user management for registration, login, password recovery, profile updates, and user group management. It supports functionalities like user authentication, password reset, file downloads, and user and group retrieval.",
     "version": "1.0.0"
   },
   "externalDocs": {
@@ -12,7 +12,11 @@
   "tags": [
     {
       "name": "user",
-      "description": "Operations related to user registration, login, password management, and group management."
+      "description": "Operations related to user registration, login, password management"
+    },
+    {
+      "name": "room",
+      "description": "Operations related to rooms (dms and groups) management."
     }
   ],
   "paths": {
@@ -176,7 +180,7 @@
           "user"
         ],
         "summary": "Initiates password reset process",
-        "description": "Sends a password reset link to the user email.",
+        "description": "Sends a password reset link to the user's email.",
         "operationId": "forgotPassword",
         "requestBody": {
           "description": "Email address for password reset",
@@ -220,7 +224,7 @@
           "user"
         ],
         "summary": "Resets the user password",
-        "description": "Allows a user to reset their password via the reset link. The reset token should be passed in the query parameter .",
+        "description": "Allows a user to reset their password via the reset link. The reset token should be passed in the query parameter.",
         "operationId": "resetPassword",
         "requestBody": {
           "description": "New password",
@@ -298,6 +302,11 @@
         "summary": "Retrieve users",
         "description": "Retrieves a list of users with filtering options.",
         "operationId": "getUsers",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
         "parameters": [
           {
             "name": "username",
@@ -368,31 +377,116 @@
           "user"
         ],
         "summary": "Retrieve user groups",
-        "description": "Retrieves groups associated with the user. Please make sure to include the JWT token in the Authorization header as a Bearer token to access this endpoint",
+        "description": "Retrieves groups associated with the user. Include the JWT token in the Authorization header.",
         "operationId": "getUserGroups",
         "security": [
           {
-            "bearerAuth": []
+            "JWT": []
           }
         ],
         "responses": {
           "200": {
-            "description": "List of user groups",
+            "description": "Groups retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "example": [
+                      "Group1",
+                      "Group2"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized due to invalid token"
+          },
+          "404": {
+            "description": "No groups found for the user"
+          }
+        }
+      }
+    },
+    "/user/notifications/delete": {
+      "delete": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Delete notifications for the current user",
+        "description": "This endpoint deletes all notifications for the currently authenticated user.",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications successfully deleted",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "rooms": {
+                    "message": {
+                      "type": "string",
+                      "example": "Successfully deleted notifications"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User ID is missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "User ID is missing"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/dms": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get direct message rooms for the current user",
+        "description": "This endpoint retrieves a list of direct message rooms the user is part of, with the users in each room.",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of direct message rooms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "direct_rooms": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
                           "room_id": {
-                            "type": "integer"
-                          },
-                          "room_type": {
-                            "type": "string"
+                            "type": "integer",
+                            "example": 1
                           },
                           "users": {
                             "type": "array",
@@ -400,7 +494,7 @@
                               "type": "object",
                               "properties": {
                                 "user_id": {
-                                  "type": "integer"
+                                  "type": "string"
                                 },
                                 "username": {
                                   "type": "string"
@@ -416,6 +510,10 @@
                                 },
                                 "profile_picture": {
                                   "type": "string"
+                                },
+                                "created_at": {
+                                  "type": "string",
+                                  "format": "date-time"
                                 }
                               }
                             }
@@ -428,24 +526,8 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized due to expired or invalid token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Token has expired"
-                    }
-                  }
-                }
-              }
-            }
-          },
           "404": {
-            "description": "User is not a member of any rooms",
+            "description": "No direct message rooms found for the user",
             "content": {
               "application/json": {
                 "schema": {
@@ -453,7 +535,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "User is not a member of any rooms"
+                      "example": "User is not a member of any direct message rooms"
                     }
                   }
                 }
@@ -463,20 +545,182 @@
         }
       }
     },
-    "/uploads/{name}": {
+    "/user/update": {
+      "put": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Update user profile",
+        "description": "This endpoint allows users to update their username, email, and profile picture.",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "profile_picture": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "User updated successfully"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "user_id": {
+                          "type": "string"
+                        },
+                        "username": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "first_name": {
+                          "type": "string"
+                        },
+                        "last_name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "profile_picture": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Username or email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "Username already in use"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "User not found"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/notifications": {
       "get": {
         "tags": [
           "user"
         ],
-        "summary": "Download a file",
-        "description": "Allows users to download a file from the uploads folder.",
-        "operationId": "downloadFile",
+        "summary": "Get notifications for the current user",
+        "description": "This endpoint retrieves a list of notifications for the authenticated user.",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notifications": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string"
+                          },
+                          "room_id": {
+                            "type": "integer"
+                          },
+                          "room_name": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{name}": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Download a user's file by name",
+        "description": "This endpoint allows downloading a user file from the server.",
         "parameters": [
           {
-            "name": "name",
             "in": "path",
+            "name": "name",
             "required": true,
-            "description": "Name of the file to download",
             "schema": {
               "type": "string"
             }
@@ -484,31 +728,650 @@
         ],
         "responses": {
           "200": {
-            "description": "File downloaded successfully",
+            "description": "File found and sent"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        }
+      }
+    },
+    "/user/dms/initiate": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Initiate a direct message room between two users",
+        "description": "This endpoint creates or retrieves a direct message room between the authenticated user and the recipient.",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipient": {
+                    "type": "object",
+                    "properties": {
+                      "user_id": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct message room created or retrieved",
             "content": {
-              "application/octet-stream": {
+              "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "binary"
+                  "type": "object",
+                  "properties": {
+                    "room_id": {
+                      "type": "integer"
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "string"
+                          },
+                          "username": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "first_name": {
+                            "type": "string"
+                          },
+                          "last_name": {
+                            "type": "string"
+                          },
+                          "profile_picture": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error if there is an issue with the request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Error message"
+                    }
+                  }
                 }
               }
             }
           },
           "404": {
-            "description": "File not found",
+            "description": "Recipient not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Recipient does not exist."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/create": {
+      "post": {
+        "summary": "Create a room",
+        "description": "Allows a user to create a new room with the specified name and type, optionally uploading a picture.",
+        "operationId": "createRoom",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "room_name": {
+                    "type": "string"
+                  },
+                  "room_type": {
+                    "type": "string"
+                  },
+                  "picture": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Room created successfully",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "message": {
-                      "type": "string",
-                      "example": "File not found"
+                      "type": "string"
+                    },
+                    "room_id": {
+                      "type": "integer"
+                    },
+                    "room_picture": {
+                      "type": "string"
                     }
                   }
                 }
               }
             }
+          },
+          "400": {
+            "description": "Missing required fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/create_direct_room": {
+      "post": {
+        "summary": "Create a direct room between two users",
+        "description": "Creates a direct chat room between the current user and another user if one does not already exist.",
+        "operationId": "createDirectRoom",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipient_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Direct room already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "room_id": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Direct room created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "room_id": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipient or cannot create a room with oneself",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/upload/{room_id}": {
+      "post": {
+        "summary": "Upload a file to a room",
+        "description": "Allows a user to upload a file to a specific room.",
+        "operationId": "uploadFile",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "link": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file provided or file type not allowed or size exceeds 100 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/messages/{room_id}": {
+      "get": {
+        "summary": "Get messages for a room",
+        "description": "Retrieves messages from a specified room, paginated by offset.",
+        "operationId": "getRoomMessages",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of room messages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "user_id": {
+                            "type": "integer"
+                          },
+                          "room_id": {
+                            "type": "integer"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "message_type": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "attachments": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "link": {
+                                "type": "string"
+                              },
+                              "size": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters or missing room ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/leave": {
+      "post": {
+        "summary": "Leave a room",
+        "description": "Allows a user to leave a specific room. If no users remain, the room is deleted.",
+        "operationId": "leaveGroup",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "room_id": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully left the group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Room ID is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User is not a member of this room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "An error occurred while leaving the group",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/room/join": {
+      "post": {
+        "summary": "Join a room",
+        "description": "Allows a user to join a room using a decrypted room code.",
+        "operationId": "joinGroup",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "room_code": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully joined the room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid room code or already a member of the room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rooms/{room_id}/{name}": {
+      "get": {
+        "summary": "Get room file",
+        "description": "Retrieves a specific file from a room.",
+        "operationId": "getRoomFile",
+        "security": [
+          {
+            "JWT": []
+          }
+        ],
+        "tags": [
+          "room"
+        ],
+        "parameters": [
+          {
+            "name": "room_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File found and returned"
+          },
+          "404": {
+            "description": "File not found"
           }
         }
       }
@@ -527,25 +1390,13 @@
             "type": "string",
             "example": "user1"
           },
-          "first_name": {
-            "type": "string",
-            "example": "John"
-          },
-          "last_name": {
-            "type": "string",
-            "example": "Doe"
-          },
           "email": {
             "type": "string",
             "example": "user1@email.com"
           },
           "role": {
             "type": "string",
-            "example": "user"
-          },
-          "account_status": {
-            "type": "string",
-            "example": "active"
+            "example": "student"
           },
           "isLogged": {
             "type": "boolean",
@@ -553,22 +1404,14 @@
           },
           "profile_picture": {
             "type": "string",
-            "example": "profile.jpg"
+            "example": "profile_pic.jpg"
           }
-        },
-        "required": [
-          "username",
-          "password",
-          "email",
-          "first_name",
-          "last_name",
-          "role"
-        ]
+        }
       }
     },
     "securitySchemes": {
-      "bearerAuth": {
-        "type": "https",
+      "JWT": {
+        "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       }
@@ -576,7 +1419,7 @@
   },
   "security": [
     {
-      "BearerAuth": []
+      "JWT": []
     }
   ]
 }
